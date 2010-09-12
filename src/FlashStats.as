@@ -1,265 +1,372 @@
 package 
 {
-
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
-	import flash.display.DisplayObject;
+	import flash.display.Graphics;
+	import flash.display.Shape;
 	import flash.display.Sprite;
+	import flash.display.Stage;
 	import flash.events.Event;
-	import flash.events.TimerEvent;
 	import flash.filters.GlowFilter;
+	import flash.geom.Matrix;
+	import flash.geom.Point;
 	import flash.geom.Rectangle;
 	import flash.system.System;
 	import flash.text.TextField;
 	import flash.text.TextFieldAutoSize;
 	import flash.text.TextFormat;
+	import flash.text.TextFormatAlign;
 	import flash.utils.getTimer;
-	import flash.utils.Timer;
 	
-	public class FlashStats extends Sprite implements IDisposable
+	
+	public class FlashStats extends Bitmap implements IDisposable
 	{
-		protected static var BACKGROUND_COLOR:uint = 0xff666666;
-		protected static var LINE_COLOR:uint = 0x33999999;
-		protected static var GRAPH_COLOR:uint = 0xffF29F05;
+		
+		private static const COLOR_BACKGROUND:int =	0x444444;
+		
+		private var mMainSprite:Stage= null;
+			
+		private var mMemoryUseBitmapData:BitmapData = null;
+		
+		private var mBitmapBackgroundData:BitmapData = null;
+		private var mBitmapBackground:Bitmap = null;
+		private var mGridLine:Rectangle = null;
+		
+		private var mTypeColumnStartPos:int = 2
+		private var mCurrentColumnStartPos:int = 80;
+		private var mMinColumnStartPos:int = 130;
+		private var mMaxColumnStartPos:int = 180;
+		
+		private var mBlittingTextField:TextField;
+		private var mBlittingTextFieldARight:TextField;
+		private var mBlittingTextFieldMatrix:Matrix = null;
+		
+		private var frameCount:int = 0;		
+		private var mLastTime:int = 0;
+		
+		private var stats:FrameStatistics ;
+		private var statsLastFrame:FrameStatistics ;
+		private var timer:int;
+		private var ms_prev:int;
+		private var fps:int=0;
+		private var mDrawGraphics:Sprite;
+		private var mDrawGraphicsMatrix:Matrix;
+		private var mGraphPos:Point;
 
-		
-		private var _mytext:TextField;
-		private var _fps:uint;
-		private var _timer:Timer;
-		private var _graph:BitmapData;
-		private var _graphMem:BitmapData;
-		private var _lineRect:Rectangle = new Rectangle();
-
-		private var _lastTotalMem:uint;
-		private var _lastTotalMemMax:uint;
-		
-		private var mLastUpdateTime:int = 0;
-		private var memGraphWidth:int = 160;
-		private var memGraphHeight:int = 12;
-		private var MinimumBartimeStamp:int = 0;
-		private var MinimumBar:Sprite
-		private var MinimumBarValue:Number = 9999999;
-		
-		public function FlashStats(obj:DisplayObject) 
+		private var mCurrentMaxMemGraph:int = 0;
+		private var mMemoryValues:Vector.<int> = null;
+		private var mMemoryMaxValues:Vector.<int> = null;
+		private var mSamplingCount:int = 0;
+		private var mSamplingStartIdx:int = 0;
+		public function FlashStats(mainSprite:Stage) 
 		{
-			Init();
-			this.mouseChildren = false;
-			this.mouseEnabled = false;
-			MinimumBartimeStamp = getTimer();
+			Init(mainSprite);
 		}
-
-		final private function Init():void 
+		
+		
+		private function Init(mainSprite:Stage) : void
 		{
+			stats = new FrameStatistics();
+			statsLastFrame = new FrameStatistics();
+			mMainSprite = mainSprite;
+			mGridLine = new Rectangle();
+			var numLines:int = 15;
+			mSamplingCount = int(mMainSprite.stageWidth / 5) + 1;
+			mMemoryValues = new Vector.<int>(mSamplingCount);
+			mMemoryMaxValues = new Vector.<int>(mSamplingCount);
+			for (var i:int = 0; i < mSamplingCount; i++)
+			{
+				mMemoryValues[i] = -1;
+				mMemoryMaxValues[i] = -1
+			}
+		
+			mBitmapBackgroundData = new BitmapData(mMainSprite.stageWidth, mMainSprite.stageHeight,true,0);
+
+			mMemoryUseBitmapData = new BitmapData(mMainSprite.stageWidth, 150,false,0xFFFFFFFF);
+			mGraphPos = new Point(0, mMainSprite.stageHeight - 150);
+			mDrawGraphics = new Sprite();
+			mDrawGraphicsMatrix = new Matrix(1,0,0,1,mMainSprite.stageWidth-5);
+			mDrawGraphics.graphics.lineStyle(3, 0xFFFF0000);
+			
+			mGridLine.width = mMainSprite.stageWidth;
+			mGridLine.height = 1;
+			this.bitmapData = mBitmapBackgroundData;
+			
+			
+			var barWidth:int = mMainSprite.stageWidth;
+
 			var myformat:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false );
+			var myformat2:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false ,null,null,null,null,TextFormatAlign.RIGHT);
 			var myglow:GlowFilter = new GlowFilter( 0x333333, 1, 2, 2, 3, 2, false, false );
-		
-			var barWidth:int = 540;
-			var bgSprite:Sprite = new Sprite();
-			bgSprite.graphics.beginFill(0x000000, 0.3);
-			bgSprite.graphics.drawRect(0, 0, barWidth, 17);
-			bgSprite.graphics.endFill();
-			bgSprite.graphics.beginFill(0xCCCCCC, 0.6);
-			bgSprite.graphics.drawRect(0, 1, barWidth, 1);
-			bgSprite.graphics.endFill();
-			bgSprite.graphics.beginFill(0xFFFFFF, 0.8);
-			bgSprite.graphics.drawRect(0, 0, barWidth, 1);
-			bgSprite.graphics.endFill();
-			addChild(bgSprite);
-
-			// fps graph
-			var memGraphHolder:Sprite = new Sprite();
-			memGraphHolder.x = 210;
-			addChild( memGraphHolder );			
-			_graphMem = new BitmapData( memGraphWidth, memGraphHeight, false, BACKGROUND_COLOR );
-			_graphMem.fillRect(_graphMem.rect, 0xFF000000);
-			var bmpMem:Bitmap = new Bitmap( _graphMem )
-			bmpMem.y = 2;
-			memGraphHolder.addChild( bmpMem );
-//			DrawGraphLines();
-
-			MinimumBar = new Sprite();
-			MinimumBar.graphics.beginFill(0xFFDD00, 0.7);
-			MinimumBar.graphics.drawRect(0, 2, 1, memGraphHeight);
-			MinimumBar.graphics.endFill();	
-			addChild(MinimumBar);
 			
-			var graphHolder:Sprite = new Sprite();
-			graphHolder.x = 65;
-			addChild( graphHolder );
-			_graph = new BitmapData( 40, 12, false, BACKGROUND_COLOR );
-			var bmp:Bitmap = new Bitmap( _graph )
-			bmp.y = 2;
-			graphHolder.addChild( bmp );
-			DrawGraphLines();
+			mBlittingTextField = new TextField();
+			mBlittingTextField .autoSize = TextFieldAutoSize.LEFT;
+			mBlittingTextField .defaultTextFormat = myformat;
+			mBlittingTextField .selectable = false;
+			mBlittingTextField .filters = [ myglow ];
 			
-			// display label
-			_mytext = new TextField();
-			_mytext.autoSize = TextFieldAutoSize.LEFT;
-			_mytext.defaultTextFormat = myformat;
-			_mytext.selectable = false;
-			_mytext.text = "  FPS = 0\t Mem = 0000 Ko \tMemMax = 0000 Ko";
-			_mytext.filters = [ myglow ];
-			_mytext.y = -1;
-			addChild( _mytext );
+			mBlittingTextFieldARight = new TextField();
+			mBlittingTextFieldARight.autoSize = TextFieldAutoSize.RIGHT;
+			mBlittingTextFieldARight.defaultTextFormat = myformat2;
+			mBlittingTextFieldARight.selectable = false;
+			mBlittingTextFieldARight.filters = [ myglow ];			
 			
-			// setup our timers
-			_fps = 0;
-			_timer = new Timer( 1000 );
-			_timer.addEventListener( TimerEvent.TIMER, OnTimerEvent,false,0,true);
-			_timer.start();
+			mBlittingTextFieldMatrix = new Matrix();
 			
-			this.addEventListener( Event.ENTER_FRAME, OnEnterFrame );
-		}
-
-		final public function Dispose():void
-		{
-			this.removeEventListener( Event.ENTER_FRAME, OnEnterFrame );
+			mainSprite.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
 			
-			_mytext = null;
-			if (_timer != null)
-			{
-				_timer.removeEventListener(TimerEvent.TIMER, OnTimerEvent);
-			}
-			_timer = null;
-			if (_graph != null)
-			{
-				_graph.dispose();	
-				_graph.dispose();	
-			}
+			fps = mainSprite.frameRate;
+			stats.MemoryFree = System.freeMemory / 1024;
+			stats.MemoryPrivate = System.privateMemory / 1024;
 			
-			if (_graphMem != null)
-			{
-				_graphMem.dispose();
-			}
+			stats.MemoryCurrent = System.totalMemory / 1024;
+			statsLastFrame.Copy(stats);
+			mCurrentMaxMemGraph = stats.MemoryCurrent;
 			
-			_lineRect = null;
-
-			MinimumBar = null;
+			
 		}
 		
-		final private function DrawGraphLines():void 
+		private var lastGraphHeight:int = 0;
+		private function OnEnterFrame(e:Event):void 
 		{
-			for ( var i:Number = 5; i < _graph.height; i += 5 ) 
+			timer = getTimer();
+
+			if ( timer - 1000 < ms_prev ) { fps++; return;  }
+
+			mSamplingStartIdx--;
+			if (mSamplingStartIdx < 0) mSamplingStartIdx = mSamplingCount - 1;
+			stats.FpsCurrent = fps;
+			ms_prev = timer;
+			
+			
+			mBitmapBackgroundData.fillRect(mBitmapBackgroundData.rect, 0xFF000000);
+
+			//Update statistics
+			stats.MemoryFree = System.freeMemory / 1024;
+			stats.MemoryPrivate = System.privateMemory / 1024;
+			
+			stats.MemoryCurrent = System.totalMemory / 1024;
+			if (stats.MemoryCurrent < stats.MemoryMin) stats.MemoryMin = stats.MemoryCurrent;
+			if (stats.MemoryCurrent > stats.MemoryMax)
 			{
-				_lineRect.x = 0;
-				_lineRect.y = i;
-				_lineRect.width = _graph.width;
-				_lineRect.height = 1;
-				_graph.fillRect( _lineRect, LINE_COLOR );
+				stats.MemoryMax = stats.MemoryCurrent;
+				
+			}
+
+			mMemoryValues[mSamplingStartIdx % mSamplingCount] = stats.MemoryCurrent;
+			mMemoryMaxValues[mSamplingStartIdx % mSamplingCount] = stats.MemoryMax;
+			
+			if (stats.FpsCurrent < stats.FpsMin) stats.FpsMin = stats.FpsCurrent;
+			if (stats.FpsCurrent > stats.FpsMax) stats.FpsMax = stats.FpsCurrent;
+			
+			
+			mBlittingTextFieldMatrix.identity();
+			mBlittingTextFieldMatrix.ty = 22;
+			
+			// Draw current values
+			mDrawGraphics.graphics.clear();
+			
+			var i:int = 0;
+			var sampleVal:int = 0;
+			var val:int = 0;
+			
+			mDrawGraphics.graphics.lineStyle(5, 0xFFFF0000);
+			var it:int = mSamplingStartIdx+1;
+			var currentX:int = mSamplingCount*5;
+			mDrawGraphics.graphics.moveTo(currentX, 150)
+			for (i= 0; i<mSamplingCount; i++)
+			{
+				it++;
+				sampleVal = mMemoryMaxValues[it % mSamplingCount];
+				if (sampleVal == -1) continue;
+				val = 150 - (sampleVal / stats.MemoryMax * 148);
+				mDrawGraphics.graphics.lineTo(currentX, val);
+				currentX -= 5;
+			}
+
+			mDrawGraphics.graphics.lineStyle(3, 0xFF0000FF);
+			it = mSamplingStartIdx+1;
+			currentX = mSamplingCount*5;
+			mDrawGraphics.graphics.moveTo(currentX, 150)
+			for (i = 0; i<mSamplingCount; i++)
+			{
+				it++;
+				sampleVal = mMemoryValues[it % mSamplingCount];
+				if (sampleVal == -1) continue;
+				val = 150 - (sampleVal / stats.MemoryMax * 148);
+				mDrawGraphics.graphics.lineTo(currentX, val);
+				currentX -= 5;
+			}
+
+			
+			mMemoryUseBitmapData.fillRect(mMemoryUseBitmapData.rect, 0xFF888888);
+			mMemoryUseBitmapData.draw(mDrawGraphics);
+			//lastGraphHeight = newCurrent;
+			
+			//mDrawGraphics.graphics.clear();
+			mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
+			mBlittingTextFieldARight.text = "Current";
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mMinColumnStartPos;
+			mBlittingTextFieldARight.text = "Min";
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mMaxColumnStartPos;
+			mBlittingTextFieldARight.text = "Max";
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+			
+			mBlittingTextFieldMatrix.ty += 14;
+			mGridLine.y = mBlittingTextFieldMatrix.ty + 2;
+			this.bitmapData.fillRect(mGridLine, 0xFFCCCCCC);
+			
+			
+			
+			// FPS
+			mBlittingTextFieldMatrix.tx = mTypeColumnStartPos;
+			mBlittingTextField.text = "fps:";
+			this.bitmapData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
+
+			
+			
+			mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
+			mBlittingTextFieldARight.text = stats.FpsCurrent.toString() + " / " + mMainSprite.frameRate;
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mMinColumnStartPos;
+			mBlittingTextFieldARight.text = stats.FpsMin.toString();
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mMaxColumnStartPos;
+			mBlittingTextFieldARight.text = stats.FpsMax.toString();
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);			
+			
+			mBlittingTextFieldMatrix.ty += 14;
+			mGridLine.y = mBlittingTextFieldMatrix.ty + 2;
+			this.bitmapData.fillRect(mGridLine, 0xFFCCCCCC);
+			
+			// Memory
+			mBlittingTextFieldMatrix.tx = mTypeColumnStartPos;
+			mBlittingTextField.text = "total-memory (Ko):";
+			this.bitmapData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
+			mBlittingTextFieldARight.text = stats.MemoryCurrent.toString();
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mMinColumnStartPos;
+			mBlittingTextFieldARight.text = stats.MemoryMin.toString();
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mMaxColumnStartPos;
+			mBlittingTextFieldARight.text = stats.MemoryMax.toString();
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);			
+			
+			mBlittingTextFieldMatrix.ty += 14;
+			mGridLine.y = mBlittingTextFieldMatrix.ty + 2;
+			this.bitmapData.fillRect(mGridLine, 0xFFCCCCCC);			
+
+			// Free-Memory
+			mBlittingTextFieldMatrix.tx = mTypeColumnStartPos;
+			mBlittingTextField.text = "free-memory (Ko):";
+			this.bitmapData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
+			mBlittingTextFieldARight.text = stats.MemoryFree.toString();
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+			
+			mBlittingTextFieldMatrix.ty += 14;
+			mGridLine.y = mBlittingTextFieldMatrix.ty + 2;
+			this.bitmapData.fillRect(mGridLine, 0xFFCCCCCC);		
+			
+			// Private-Memory
+			mBlittingTextFieldMatrix.tx = mTypeColumnStartPos;
+			mBlittingTextField.text = "private-memory (Ko):";
+			this.bitmapData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
+			mBlittingTextFieldARight.text = stats.MemoryPrivate.toString();
+			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+			
+			mBlittingTextFieldMatrix.ty += 14;
+			mGridLine.y = mBlittingTextFieldMatrix.ty + 2;
+			this.bitmapData.fillRect(mGridLine, 0xFFCCCCCC);					
+			
+			Render();
+			
+			statsLastFrame.Copy(stats);
+			fps = 0;
+			
+		}
+		
+
+		
+
+		private function Render() : void
+		{
+			
+			this.bitmapData.copyPixels(mMemoryUseBitmapData, mMemoryUseBitmapData.rect, mGraphPos);
+			this.alpha = Options.mCurrentGradient / 10;
+		}
+		
+
+		
+		public function Dispose() : void
+		{
+			mMemoryUseBitmapData.dispose();
+			mMemoryUseBitmapData = null;
+			mBitmapBackgroundData.dispose();
+			mBitmapBackgroundData = null;
+			mBitmapBackground = null;
+			mGridLine = null;
+			mBlittingTextField = null;
+			mBlittingTextFieldARight = null;
+			mBlittingTextFieldMatrix = null;
+		
+			stats = null;
+			statsLastFrame = null;
+			mDrawGraphics = null;
+			mDrawGraphicsMatrix = null;
+			mGraphPos = null;
+			
+			mMemoryValues = null;
+			mMemoryMaxValues = null;
+			
+			if (mMainSprite.hasEventListener(Event.ENTER_FRAME)) mMainSprite.removeEventListener(Event.ENTER_FRAME, OnEnterFrame);
+			
+			if (mMainSprite != null && mMainSprite != null)
+			{
+				mMainSprite = null;
 			}
 		}
 		
-		final private function OnEnterFrame( e:Event ):void 
-		{
-			var totalMem:int = int(System.totalMemory / 1000)
-			var diff:int = totalMem - _lastTotalMem;
-			var time:int = getTimer();
-			
-			mLastUpdateTime = time;
-			_fps++;
-			_graphMem.scroll(0, -1);
-			var posX:int = (Number(_lastTotalMem) / Number(_lastTotalMemMax))  * _graphMem.width-1;
-			//trace(posX);
-			_graphMem.lock();
-			
-			for (var i:int = 0; i < memGraphWidth; i++)
-			{
-				var color:uint = (_graphMem.getPixel(i, memGraphHeight - 2))
-				var r:uint = (((color&0xFF0000) >> 16) *0.99) << 16;
-				var g:uint = (((color&0x00FF00) >> 8) *0.99) << 8;
-				var b:uint = (((color & 0x0000FF)) *0.99);
-				color = r + g + b;
-				_graphMem.setPixel32(i, memGraphHeight - 1, color);
-			}
-			
-			_graphMem.setPixel32(posX, _graphMem.height - 1, 0xFFFFFFFF)			
-			_graphMem.unlock();
-			
-			if (MinimumBar != null)
-			{
-				var posBar:int 
-				if (_lastTotalMem < MinimumBarValue)
-				{
-					posBar = (Number(_lastTotalMem) / Number(_lastTotalMemMax))  * _graphMem.width-2;
-					MinimumBarValue = _lastTotalMem;
-					MinimumBartimeStamp = getTimer();
-					MinimumBar.x = 210 + posBar;
-				}
-				if (MinimumBarValue == 0)
-				{
-					MinimumBarValue = 1
-				}				
-				if (getTimer() - MinimumBartimeStamp > 1000 * 10)
-				{
-					if (_lastTotalMem - MinimumBarValue < 30)
-					{
-						MinimumBarValue = _lastTotalMem;
-						MinimumBartimeStamp = getTimer();
-					}
-					else
-					{
-						MinimumBarValue += (_lastTotalMem-MinimumBarValue)*0.01;
-					}
-					posBar = (Number(MinimumBarValue) / Number(_lastTotalMemMax))  * _graphMem.width - 2;
-					if (posBar > _graphMem.width-2)
-					{
-						posBar = _graphMem.width-2
-					}
-					
-					MinimumBar.x = 210 + posBar;
-				}
-			}
-			
-			
-		}
-		/**
-		 * Manage the Timer event to update number on screen
-		 * @param	e
-		 */
-		final private function OnTimerEvent( e:Event ):void 
-		{
-			// update our graph for the current tick
-			_lineRect.x = _graph.width -1 ;
-			_lineRect.y = 0;
-			_lineRect.width = 1;
-			_lineRect.height = _graph.height;			
-			_graph.fillRect( _lineRect, BACKGROUND_COLOR );
-			var val:Number = ( _fps / 2 );
-			_lineRect.x = _graph.width - 1;
-			_lineRect.width = 1;
-			if (this.stage != null)
-			{
-				_lineRect.height = _graph.height * (Number(_fps) / Number(this.stage.frameRate));
-			}
-			else
-			{
-				_lineRect.height = _graph.height;
-			}		
-			_lineRect.y = _graph.height-_lineRect.height;
-			_graph.fillRect( _lineRect, GRAPH_COLOR );
-			_graph.scroll( -2, 0 );
-			DrawGraphLines();
+	}
+}
 
-
-
-			var totalMem:int = int(System.totalMemory / 1000)
-			_lastTotalMem = totalMem;
-			if (_lastTotalMem > _lastTotalMemMax)
-			{
-				_lastTotalMemMax = _lastTotalMem;
-			}
-			
-
-			
-			_mytext.text = "  FPS = "
-			_mytext.appendText(_fps.toString());
-			_mytext.appendText("\t\t\t\tMem = ");
-			_mytext.appendText(totalMem.toString());
-			_mytext.appendText(" Ko");			
-			_mytext.appendText("\t\t\t\t\t\t\t\t\t\t\tMax = ");
-			_mytext.appendText(_lastTotalMemMax.toString());
-			_mytext.appendText(" Ko");							
-			_fps = 0;
-		}
+internal class FrameStatistics
+{
+	public var FpsCurrent:int = 0;
+	public var FpsMin:int = int.MAX_VALUE;
+	public var FpsMax:int = 0;
+	
+	public var MemoryCurrent:int = 0;
+	public var MemoryMin:int = int.MAX_VALUE;
+	public var MemoryMax:int = 0;
+	
+	public var MemoryFree:uint = 0;
+	public var MemoryPrivate:uint = 0;
+	
+	public function Copy(obj:FrameStatistics) : void
+	{
+		FpsCurrent = obj.FpsCurrent;
+		FpsMin = obj.FpsMin;
+		FpsMax = obj.FpsMax;
+		
+		MemoryCurrent = obj.MemoryCurrent;
+		MemoryMin = obj.MemoryMin;
+		MemoryMax = obj.MemoryMax;
+		
+		MemoryFree = obj.MemoryFree;
+		MemoryPrivate = obj.MemoryPrivate;
 	}
 }

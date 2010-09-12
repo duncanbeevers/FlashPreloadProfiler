@@ -6,6 +6,7 @@ package
 	import flash.display.DisplayObjectContainer;
 	import flash.display.InteractiveObject;
 	import flash.display.Sprite;
+	import flash.display.Stage;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
 	import flash.geom.Rectangle;
@@ -23,19 +24,19 @@ package
 		private static const COLOR_ALPHA:Number =	0.30;
 		private static const COLOR_BACKGROUND:int =	0x000000;
 		
-		private var mMainSprite:DisplayObjectContainer = null;
+		private var mMainSprite:Stage = null;
 		
 		private var mRenderTargetData:BitmapData = null;
 		private var mRenderTarget:Bitmap = null;
 		private var mRenderTargetDataRect:Rectangle = null;		
 		private var currentRenderTarget:Sprite = new Sprite();
 		
-		public function MouseListeners(mainSprite:DisplayObjectContainer) 
+		public function MouseListeners(mainSprite:Stage) 
 		{
 			Init(mainSprite);
 		}
 		
-		private function Init(mainSprite:DisplayObjectContainer) : void
+		private function Init(mainSprite:Stage) : void
 		{
 			mMainSprite = mainSprite;
 			
@@ -43,7 +44,7 @@ package
 			this.mouseEnabled = false;
 			
 			
-			mRenderTargetData = new BitmapData(mMainSprite.stage.stageWidth, mMainSprite.stage.stageHeight, false, 0);
+			mRenderTargetData = new BitmapData(mMainSprite.stageWidth, mMainSprite.stageHeight, false, 0);
 			mRenderTargetDataRect = mRenderTargetData.rect;
 			mRenderTarget = new Bitmap();
 			mRenderTarget.bitmapData = mRenderTargetData;
@@ -53,9 +54,8 @@ package
 			trace("MouseListeners initialized");
 		}
 		
-		final  public function Dispose() : void
+		 public function Dispose() : void
 		{
-			trace("Dispose MouseListeners");
 			if (mMainSprite!= null && mMainSprite.stage != null)
 			{
 				mMainSprite.stage.removeEventListener(Event.ENTER_FRAME, Update);	
@@ -93,7 +93,10 @@ package
 		}
 		protected function ParseStage(obj:DisplayObjectContainer) : void
 		{
-			if (obj != null)
+			if (obj == null || obj==FlashPreloadProfiler.MySprite) return;
+			
+			if (obj.mouseChildren == false) return;
+			
 			for (var i:int = 0; i < obj.numChildren;i++)
 			{
 				var child:DisplayObject = obj.getChildAt(i);

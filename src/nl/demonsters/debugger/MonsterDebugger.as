@@ -7,7 +7,7 @@
  * Be aware that any traces made to De MonsterDebugger may 
  * be viewed by others. De MonsterDebugger is intended to be 
  * used to debug Flash, FLEX or AIR applications in a protective
- * environment that they will not be used in the final launch. 
+ * environment that they will not be used in the launch. 
  * Please make sure that you do not send any debug material to
  * the debugger from a live running application. 
  * 

@@ -6,10 +6,10 @@
     <movie input="" />
     <movie path="bin\FlashPreloadProfiler.swf" />
     <movie fps="30" />
-    <movie width="800" />
-    <movie height="100" />
-    <movie version="10" />
-    <movie background="#0080C0" />
+    <movie width="500" />
+    <movie height="300" />
+    <movie version="11" />
+    <movie background="#2F332F" />
   </output>
   <!-- Other classes to be compiled into your SWF -->
   <classpaths>
@@ -79,6 +79,6 @@
   <!-- Other project options -->
   <options>
     <option showHiddenPaths="False" />
-    <option testMovie="NewWindow" />
+    <option testMovie="ExternalPlayer" />
   </options>
 </project>

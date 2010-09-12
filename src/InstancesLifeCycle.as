@@ -3,6 +3,7 @@
 	import flash.display.GradientType;
 	import flash.display.Shape;
 	import flash.display.Sprite;
+	import flash.display.Stage;
 	import flash.events.Event;
 	import flash.events.EventPhase;
 	import flash.events.TimerEvent;
@@ -29,12 +30,12 @@
 		private static const COLOR_ALPHA:Number =	0.30;
 		private static const COLOR_BACKGROUND:int =	0x444444;
 		
-		private var mMainSprite:Sprite = null;
-		private var mAssetsDict:Dictionary = new Dictionary(true);		
+		private var mMainSprite:Stage = null;
+		private var mAssetsDict:Dictionary = null;
 		
-		private var renderTarget1:Shape = new Shape();
-		private var renderTarget2:Shape = new Shape();
-		private var currentRenderTarget:Shape = renderTarget2;
+		private var renderTarget1:Shape = null;
+		private var renderTarget2:Shape = null;
+		private var currentRenderTarget:Shape = null;
 		
 		private var mInfos:TextField;
 		
@@ -45,26 +46,31 @@
 		private var mDOTotal:int = 0;
 		private var mDOToCollect:int = 0;
 		
-		public function InstancesLifeCycle(mainSprite:Sprite) 
+		public function InstancesLifeCycle(mainSprite:Stage) 
 		{
 			Init(mainSprite);
 		}
 		
-		final  private function Init(mainSprite:Sprite) : void
+		 private function Init(mainSprite:Stage) : void
 		{
 			mMainSprite = mainSprite;
 			
-			this.addChild(renderTarget1);
-			this.addChild(renderTarget2);
 			this.mouseChildren = false;
 			this.mouseEnabled = false;
 			
-			mMainSprite.stage.addEventListener(Event.ADDED_TO_STAGE, OnAddedToStage, true);
-			mMainSprite.stage.addEventListener(Event.REMOVED_FROM_STAGE, OnRemovedToStage, true);
-			mMainSprite.stage.addEventListener(Event.ENTER_FRAME, Update);
+			mAssetsDict = new Dictionary(true);		
+			renderTarget1 = new Shape();
+			renderTarget2 = new Shape();
+			currentRenderTarget = renderTarget2;
+			this.addChild(renderTarget1);
+			this.addChild(renderTarget2);
+			
+			mMainSprite.addEventListener(Event.ADDED_TO_STAGE, OnAddedToStage, true);
+			mMainSprite.addEventListener(Event.REMOVED_FROM_STAGE, OnRemovedToStage, true);
+			mMainSprite.addEventListener(Event.ENTER_FRAME, Update);
 			this.swapChildren(renderTarget1, renderTarget2);
 			
-			var barWidth:int = mMainSprite.stage.stageWidth;
+			var barWidth:int = mMainSprite.stageWidth;
 			var bgSprite:Sprite = new Sprite();
 			bgSprite.graphics.beginFill(0x000000, 0.3);
 			bgSprite.graphics.drawRect(0, 0, barWidth, 17);
@@ -76,7 +82,7 @@
 			bgSprite.graphics.drawRect(0, 0, barWidth, 1);
 			bgSprite.graphics.endFill();
 			addChild(bgSprite);
-			bgSprite.y = mMainSprite.stage.stageHeight - bgSprite.height;
+			bgSprite.y = mMainSprite.stageHeight - bgSprite.height;
 
 			var myformat:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false );
 			var myglow:GlowFilter = new GlowFilter( 0x333333, 1, 2, 2, 3, 2, false, false );
@@ -85,11 +91,11 @@
 			mInfos.autoSize = TextFieldAutoSize.LEFT;
 			mInfos.defaultTextFormat = myformat;
 			mInfos.selectable = false;
-			mInfos.text = "FlashPreloadProfiler";
+			mInfos.text = "";
 			mInfos.filters = [ myglow ];
 			mInfos.x = 2;
 			addChild( mInfos );
-			mInfos.y = mMainSprite.stage.stageHeight - bgSprite.height;
+			mInfos.y = mMainSprite.stageHeight - bgSprite.height;
 
 			mTimer = new Timer( 1000 );
 			mTimer.addEventListener( TimerEvent.TIMER, OnTimerEvent,false,0,true);
@@ -101,7 +107,7 @@
 			
 		}
 		
-		final public function Dispose() : void
+		public function Dispose() : void
 		{
 			trace("Diposing Instances life");
 			
@@ -114,11 +120,11 @@
 			mTimer = null;
 
 			
-			if (mMainSprite != null && mMainSprite.stage != null)
+			if (mMainSprite != null && mMainSprite != null)
 			{
-				mMainSprite.stage.removeEventListener(Event.ADDED_TO_STAGE, OnAddedToStage, true);
-				mMainSprite.stage.removeEventListener(Event.REMOVED_FROM_STAGE, OnRemovedToStage, true);
-				mMainSprite.stage.removeEventListener(Event.ENTER_FRAME, Update);
+				mMainSprite.removeEventListener(Event.ADDED_TO_STAGE, OnAddedToStage, true);
+				mMainSprite.removeEventListener(Event.REMOVED_FROM_STAGE, OnRemovedToStage, true);
+				mMainSprite.removeEventListener(Event.ENTER_FRAME, Update);
 				mMainSprite = null;
 			}
 			mAssetsDict = null;
@@ -147,7 +153,7 @@
 			
 		}
 		
-		final private function SwapRenderTarget() : void
+		private function SwapRenderTarget() : void
 		{
 			if (currentRenderTarget == renderTarget1)
 			{
@@ -160,7 +166,7 @@
 			this.swapChildren(renderTarget1, renderTarget2);
 		}
 		
-		final private function Update(e:Event):void 
+		private function Update(e:Event):void 
 		{
 			SwapRenderTarget();
 		
@@ -168,7 +174,7 @@
 			currentRenderTarget.graphics.clear();
 
 			currentRenderTarget.graphics.beginFill(COLOR_BACKGROUND, COLOR_ALPHA/1);
-			currentRenderTarget.graphics.drawRect(0,0,mMainSprite.stage.stageWidth,mMainSprite.stage.stageHeight);
+			currentRenderTarget.graphics.drawRect(0,0,mMainSprite.stageWidth,mMainSprite.stageHeight);
 			currentRenderTarget.graphics.endFill();
 			
 			var rect:Rectangle = null;
@@ -191,49 +197,47 @@
 		{
 			
 			var obj : DisplayObject = e.target as DisplayObject;
-			
-			if (obj != mMainSprite)
-			{
-				
-				
-				var rect:Rectangle = obj.getRect(mMainSprite);
-				var newObj:Boolean = true;
-				if (mAssetsDict[obj] == true)
-				{
-					newObj = false;
-				}
-				if (newObj)
-				{
-					//trace("Added Create", e.currentTarget, e.target,rect);
-					mAddedLastSecond++;
-					currentRenderTarget.graphics.beginFill(COLOR_CREATE, 0.9);
-					if (rect.width < 8 && rect.width < 8)
-					{
-						currentRenderTarget.graphics.drawCircle(rect.x, rect.y, 4);
-					}
-					else
-					{
-						currentRenderTarget.graphics.drawRect(rect.x, rect.y, rect.width, rect.height);
-					}
-					currentRenderTarget.graphics.endFill();
 
-					mAssetsDict[obj] = true;
+			if (obj == mMainSprite) return;
+			if (obj == FlashPreloadProfiler.MySprite) return;
+			
+			var rect:Rectangle = obj.getRect(mMainSprite);
+			var newObj:Boolean = true;
+			if (mAssetsDict[obj] == true)
+			{
+				newObj = false;
+			}
+			if (newObj)
+			{
+				//trace("Added Create", e.currentTarget, e.target,rect);
+				mAddedLastSecond++;
+				currentRenderTarget.graphics.beginFill(COLOR_CREATE, 0.9);
+				if (rect.width < 8 && rect.width < 8)
+				{
+					currentRenderTarget.graphics.drawCircle(rect.x, rect.y, 4);
 				}
 				else
 				{
-					//trace("Added ReUSe", e.currentTarget, e.target);
-					currentRenderTarget.graphics.beginFill(COLOR_RE_USE, 0.9);
-					if (rect.width < 8 && rect.width < 8)
-					{
-						currentRenderTarget.graphics.drawCircle(rect.x, rect.y, 4);
-					}
-					else
-					{
-						currentRenderTarget.graphics.drawRect(rect.x, rect.y, rect.width, rect.height);
-					}					
-					
-					currentRenderTarget.graphics.endFill();
+					currentRenderTarget.graphics.drawRect(rect.x, rect.y, rect.width, rect.height);
 				}
+				currentRenderTarget.graphics.endFill();
+
+				mAssetsDict[obj] = true;
+			}
+			else
+			{
+				//trace("Added ReUSe", e.currentTarget, e.target);
+				currentRenderTarget.graphics.beginFill(COLOR_RE_USE, 0.9);
+				if (rect.width < 8 && rect.width < 8)
+				{
+					currentRenderTarget.graphics.drawCircle(rect.x, rect.y, 4);
+				}
+				else
+				{
+					currentRenderTarget.graphics.drawRect(rect.x, rect.y, rect.width, rect.height);
+				}					
+				
+				currentRenderTarget.graphics.endFill();
 			}
 		}
 
@@ -242,29 +246,28 @@
 			//trace("Removed", e.currentTarget, e.target);
 			var obj : DisplayObject = e.target as DisplayObject;
 			
+			if (obj == mMainSprite) return;
+			if (obj == FlashPreloadProfiler.MySprite) return;
 			
-			if (obj != mMainSprite)
+			if (mAssetsDict[obj] == true)
 			{
-				if (mAssetsDict[obj] == true)
-				{
-					mRemovedLastSecond++;
-				}
-				
-				var rect:Rectangle = obj.getRect(mMainSprite);
-
-				currentRenderTarget.graphics.beginFill(COLOR_REMOVED, 0.9);
-				currentRenderTarget.graphics.drawRect(rect.x-2, rect.y-2, rect.width+4, rect.height+4);
-				currentRenderTarget.graphics.endFill();
-				
-				mAssetsDict[obj] = false;
+				mRemovedLastSecond++;
 			}
+			
+			var rect:Rectangle = obj.getRect(mMainSprite);
+
+			currentRenderTarget.graphics.beginFill(COLOR_REMOVED, 0.9);
+			currentRenderTarget.graphics.drawRect(rect.x-2, rect.y-2, rect.width+4, rect.height+4);
+			currentRenderTarget.graphics.endFill();
+			
+			mAssetsDict[obj] = false;
 		}
 		
-final private function ParseStage(obj:DisplayObjectContainer) : void
+		private function ParseStage(obj:DisplayObjectContainer) : void
 		{
 			//trace("ParseStage", obj);
 			//If obj is null, the object couln't be casted to container... slower but less validation and condition.
-			if (obj == null) return; 
+			if (obj == null || obj==FlashPreloadProfiler.MySprite) return; 
 			for (var i:int = 0; i < obj.numChildren;i++)
 			{
 				mDOTotal++;

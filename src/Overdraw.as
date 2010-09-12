@@ -5,6 +5,7 @@ package
 	import flash.display.DisplayObject;
 	import flash.display.DisplayObjectContainer;
 	import flash.display.Sprite;
+	import flash.display.Stage;
 	import flash.events.Event;
 	import flash.events.TimerEvent;
 	import flash.filters.GlowFilter;
@@ -25,7 +26,7 @@ package
 		private static const COLOR_ALPHA:Number =	0.30;
 		private static const COLOR_BACKGROUND:int =	0x000000;
 		
-		private var mMainSprite:DisplayObjectContainer = null;		
+		private var mMainSprite:Stage= null;		
 	
 		private var mRenderTargetData:BitmapData = null;
 		private var mRenderTargetDataRect:Rectangle = null;		
@@ -39,12 +40,12 @@ package
 		private var mMaxDepth:int = 0;
 		
 		
-		final public function Overdraw(mainSprite:DisplayObjectContainer) 
+		public function Overdraw(mainSprite:Stage) 
 		{			
 			Init(mainSprite);
 		}
 		
-		final  private function Init(mainSprite:DisplayObjectContainer) : void
+		 private function Init(mainSprite:Stage) : void
 		{
 			mMainSprite = mainSprite;
 			//This shouldn't influence mouse.
@@ -52,7 +53,7 @@ package
 			this.mouseEnabled = false;
 						
 			//Initialize render Target
-			mRenderTargetData = new BitmapData(mMainSprite.stage.stageWidth, mMainSprite.stage.stageHeight, false, 0);
+			mRenderTargetData = new BitmapData(mMainSprite.stageWidth, mMainSprite.stageHeight, false, 0);
 			mRenderTargetDataRect = mRenderTargetData.rect;
 			mRenderTarget = new Bitmap();
 			mRenderTarget.bitmapData = mRenderTargetData;
@@ -61,9 +62,9 @@ package
 			this.addChild(mRenderTarget);
 			
 			// Listen to Enter Frame events.
-			mMainSprite.stage.addEventListener(Event.ENTER_FRAME, Update);
+			mMainSprite.addEventListener(Event.ENTER_FRAME, Update);
 			
-			var barWidth:int = mMainSprite.stage.stageWidth;
+			var barWidth:int = mMainSprite.stageWidth;
 			var bgSprite:Sprite = new Sprite();
 			bgSprite.graphics.beginFill(0x000000, 0.3);
 			bgSprite.graphics.drawRect(0, 0, barWidth, 17);
@@ -75,7 +76,7 @@ package
 			bgSprite.graphics.drawRect(0, 0, barWidth, 1);
 			bgSprite.graphics.endFill();
 			addChild(bgSprite);
-			bgSprite.y = mMainSprite.stage.stageHeight - bgSprite.height;
+			bgSprite.y = mMainSprite.stageHeight - bgSprite.height;
 
 			var myformat:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false );
 			var myglow:GlowFilter = new GlowFilter( 0x333333, 1, 2, 2, 3, 2, false, false );
@@ -88,7 +89,7 @@ package
 			mInfos.filters = [ myglow ];
 			mInfos.x = 2;
 			addChild( mInfos );
-			mInfos.y = mMainSprite.stage.stageHeight - bgSprite.height;
+			mInfos.y = mMainSprite.stageHeight - bgSprite.height;
 
 			mTimer = new Timer( 1000 );
 			mTimer.addEventListener( TimerEvent.TIMER, OnTimerEvent,false,0,true);
@@ -112,9 +113,9 @@ package
 		/**
 		 * Dispose Everything. Free memory.
 		 */
-		final public function Dispose():void
+		public function Dispose():void
 		{
-			trace("Dispose Overdraw");
+			//trace("Dispose Overdraw");
 			
 			mInfos = null;
 			
@@ -124,9 +125,9 @@ package
 			}
 			mTimer = null;
 			
-			if (mMainSprite!= null && mMainSprite.stage != null)
+			if (mMainSprite!= null && mMainSprite != null)
 			{
-				mMainSprite.stage.removeEventListener(Event.ENTER_FRAME, Update);	
+				mMainSprite.removeEventListener(Event.ENTER_FRAME, Update);	
 			}
 			
 			if (mRenderTarget != null)
@@ -148,7 +149,7 @@ package
 			currentRenderTarget = null;
 		}
 				
-		final private function Update(e:Event):void 
+		private function Update(e:Event):void 
 		{
 			//Clear the renderTarget
 			
@@ -161,11 +162,11 @@ package
 				ParseStage(mMainSprite);
 			mRenderTargetData.unlock();			
 		}
-		final private function ParseStage(obj:DisplayObjectContainer, depth:int=1) : void
+		private function ParseStage(obj:DisplayObjectContainer, depth:int=1) : void
 		{
 			//trace("ParseStage", obj);
 			//If obj is null, the object couln't be casted to container... slower but less validation and condition.
-			if (obj == null) return; 
+			if (obj == null || obj==FlashPreloadProfiler.MySprite) return; 
 			
 			if (mMaxDepth < depth) mMaxDepth = depth;
 			for (var i:int = 0; i < obj.numChildren;i++)
