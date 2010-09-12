@@ -345,6 +345,7 @@
 			{
 				Options.mIsCamEnabled = true;
 				Options.mIsSaveEnabled = true;				
+				Options.mIsClockEnabled = true;				
 				OptionsLayer.mRecordingTxt.text = "Save to Clipboard:";
 				OptionsLayer.ShowInterfaceCustomizer(true);
 				this.ShowProfiler = new SamplerProfiler(MainStage);
@@ -353,6 +354,7 @@
 			else if (aClass == InternalEventsProfiler)
 			{
 				Options.mIsSaveEnabled = true;				
+				Options.mIsClockEnabled = true;				
 				OptionsLayer.mRecordingTxt.text = "Save to Clipboard:";
 				OptionsLayer.ShowInterfaceCustomizer(true);
 				this.ShowInternalEvents = new InternalEventsProfiler(MainStage);

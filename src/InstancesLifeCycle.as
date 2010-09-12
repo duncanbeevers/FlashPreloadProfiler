@@ -36,8 +36,10 @@
 		private var renderTarget1:Shape = null;
 		private var renderTarget2:Shape = null;
 		private var currentRenderTarget:Shape = null;
+		private var mLegend:Sprite = null;
 		
 		private var mInfos:TextField;
+		private var mLegendTxt:Array = null;
 		
 		private var mTimer:Timer;
 		
@@ -57,13 +59,32 @@
 			
 			this.mouseChildren = false;
 			this.mouseEnabled = false;
-			
+			mLegend = new Sprite();
 			mAssetsDict = new Dictionary(true);		
 			renderTarget1 = new Shape();
 			renderTarget2 = new Shape();
 			currentRenderTarget = renderTarget2;
 			this.addChild(renderTarget1);
 			this.addChild(renderTarget2);
+			
+			mLegend.y = mMainSprite.stageHeight-28;
+			mLegend.graphics.clear();
+			mLegend.graphics.beginFill(COLOR_CREATE, 1);
+			mLegend.graphics.drawRect(2, 0, 10, 7);
+			mLegend.graphics.endFill();
+			mLegend.graphics.beginFill(COLOR_RE_USE, 1);
+			mLegend.graphics.drawRect(2+60, 0, 10, 7);
+			mLegend.graphics.endFill();
+			mLegend.graphics.beginFill(COLOR_REMOVED, 1);
+			mLegend.graphics.drawRect(2+120, 0, 10, 7);
+			mLegend.graphics.endFill();
+			mLegend.graphics.beginFill(COLOR_WAITING_GC, 1);
+			mLegend.graphics.drawRect(2+180, 0, 10, 7);
+			mLegend.graphics.endFill();
+			addChild(mLegend);
+			mLegend.alpha=0.5
+			
+			
 			
 			mMainSprite.addEventListener(Event.ADDED_TO_STAGE, OnAddedToStage, true);
 			mMainSprite.addEventListener(Event.REMOVED_FROM_STAGE, OnRemovedToStage, true);
@@ -85,6 +106,7 @@
 			bgSprite.y = mMainSprite.stageHeight - bgSprite.height;
 
 			var myformat:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false );
+			var myformatSmall:TextFormat = new TextFormat( "_sans", 9, 0xffffff, false );
 			var myglow:GlowFilter = new GlowFilter( 0x333333, 1, 2, 2, 3, 2, false, false );
 			
 			mInfos = new TextField();
@@ -97,6 +119,27 @@
 			addChild( mInfos );
 			mInfos.y = mMainSprite.stageHeight - bgSprite.height;
 
+			mLegendTxt = [new TextField(), new TextField(), new TextField(), new TextField()];
+			
+			for (var i:int = 0; i < 4; i++)
+			{
+				mLegendTxt[i].autoSize = TextFieldAutoSize.LEFT;
+				mLegendTxt[i].defaultTextFormat = myformatSmall;
+				mLegendTxt[i].selectable = false;
+				mLegendTxt[i].filters = [ myglow ];
+				mLegend.addChild( mLegendTxt[i] );
+				mLegendTxt[i].y = -4;			
+			}
+			mLegendTxt[0].x = 12;
+			mLegendTxt[0].text = "Create";
+			mLegendTxt[1].x = 12+60;
+			mLegendTxt[1].text = "Re-Use";
+			mLegendTxt[2].x = 12+120;
+			mLegendTxt[2].text = "Removed";
+			mLegendTxt[3].x = 12+180;
+			mLegendTxt[3].text = "Waiting GC";
+			
+			
 			mTimer = new Timer( 1000 );
 			mTimer.addEventListener( TimerEvent.TIMER, OnTimerEvent,false,0,true);
 			mTimer.start();
@@ -112,6 +155,13 @@
 			trace("Diposing Instances life");
 			
 			mInfos = null;
+			mLegend = null;
+			for (var i:int; i < mLegendTxt.length; i++)
+			{
+				removeChild(mLegendTxt[i]);
+				mLegendTxt[i] = null;	
+			}
+			
 			
 			if (mTimer != null)
 			{

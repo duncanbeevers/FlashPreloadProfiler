@@ -122,8 +122,10 @@ package
 		
 		private var mGradientDown:Bitmap;
 		private var mGradientUp:Bitmap;
+		private var mClockUpOut:Bitmap;
 		private var mClockUp:Bitmap;
 		private var mClockIcon:Bitmap;
+		private var mClockDownOut:Bitmap;
 		private var mClockDown:Bitmap;
 		private var mDisk:Bitmap;
 		private var mDiskOut:Bitmap;
@@ -207,7 +209,7 @@ package
 			mMinimizeButton.addEventListener(MouseEvent.CLICK, function():void 
 			{ 
 					mLastSelected = mMinimizeButton;
-					mInfos.text = "FlashPreloadProfiler";
+					mInfos.text = "FlashPreloadProfiler BETA";
 					ResetColors(mMinimizeButton); 
 					dispatchEvent(new Event("toggleMinimize",true)); } );
 			addChild(mMinimizeButton);
@@ -341,7 +343,7 @@ package
 			mInfos.autoSize = TextFieldAutoSize.LEFT;
 			mInfos.defaultTextFormat = myformat;
 			mInfos.selectable = false;
-			mInfos.text = "FlashPreloadProfiler";
+			mInfos.text = "FlashPreloadProfiler BETA";
 			mInfos.filters = [ myglow ];
 			mInfos.x = debuggerIcon.x + 50;
 			addChild( mInfos );
@@ -380,11 +382,13 @@ package
 			obj.visible = false;	
 			mInterface.addChild(obj);
 			mGradientUp = obj;
-			
+
 			obj = new IconArrowDownOut() as Bitmap;
 			obj.y = 4;
 			obj.x = - 12*5		
+			mClockDownOut = obj;
 			mInterface.addChild(obj);
+			
 			obj = new IconArrowDown() as Bitmap;			
 			obj.y = 4;
 			obj.x = - 12 * 5
@@ -401,6 +405,7 @@ package
 			obj = new IconArrowUpOut() as Bitmap;
 			obj.y = 4;
 			obj.x = - 12*3			
+			mClockUpOut = obj;			
 			mInterface.addChild(obj);
 			obj = new IconArrowUp() as Bitmap;
 			obj.y = 4;
@@ -408,8 +413,9 @@ package
 			mInterface.addChild(obj);
 			obj.visible = false;		
 			mClockUp = obj;			
-			
+
 			addChild(mInterface);
+			
 			
 			obj = new IconTrashOut() as Bitmap;
 			obj.y = 4;
@@ -497,9 +503,9 @@ package
 			mInterface.visible = enable;
 			mDiskOut.visible = mIsSaveEnabled;
 			mRecordingTxt.visible = mIsSaveEnabled;
-			//mClockDown.visible = mIsClockEnabled;
-			//mClockUp.visible = mIsClockEnabled;
-			//mClockIcon.visible = mIsClockEnabled;
+			mClockDownOut.visible = mIsClockEnabled;
+			mClockUpOut.visible = mIsClockEnabled;
+			mClockIcon.visible = mIsClockEnabled;
 			mCamOut.visible = mIsCamEnabled;
 			
 		}
@@ -667,22 +673,26 @@ package
 			{
 				mGradientDown.visible = false;
 			}
-			if (mClockDown.mouseX >=0 && mClockDown.mouseX < 12 && mClockDown.mouseY >=0 && mClockDown.mouseY < 12)
+			
+			if (mIsClockEnabled)
 			{
-				mClockDown.visible = true;
+				if (mClockDown.mouseX >=0 && mClockDown.mouseX < 12 && mClockDown.mouseY >=0 && mClockDown.mouseY < 12)
+				{
+					mClockDown.visible = true;
+				}
+				else
+				{
+					mClockDown.visible = false;
+				}
+				if (mClockUp.mouseX >=0 && mClockUp.mouseX < 12 && mClockUp.mouseY >=0 && mClockUp.mouseY < 12)
+				{
+					mClockUp.visible = true;
+				}
+				else
+				{
+					mClockUp.visible = false;
+				}					
 			}
-			else
-			{
-				mClockDown.visible = false;
-			}
-			if (mClockUp.mouseX >=0 && mClockUp.mouseX < 12 && mClockUp.mouseY >=0 && mClockUp.mouseY < 12)
-			{
-				mClockUp.visible = true;
-			}
-			else
-			{
-				mClockUp.visible = false;
-			}					
 		}
 		
 		public function SetMonsterDisabled():void

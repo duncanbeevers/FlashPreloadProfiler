@@ -61,7 +61,7 @@
 			mInfos.autoSize = TextFieldAutoSize.LEFT;
 			mInfos.defaultTextFormat = myformat;
 			mInfos.selectable = false;
-			mInfos.appendText("FlashPreloadProfiler is an open source multi-purpose profiler designed to help productivity and stability \nduring development by exposing “under the hood” representation of any flash scene.");
+			mInfos.appendText("FlashPreloadProfiler BETA is an open source multi-purpose profiler designed to help productivity and stability \nduring development by exposing “under the hood” representation of any flash scene.");
 			mInfos.appendText("\nThe main goal is to help expose and diagnose problems before they get too big.");
 			mInfos.appendText("\nIt enables developers, artists, designer or testers to see what sometimes “cannot be seen” such as:");
 			mInfos.appendText("\n\t-What is the current FPS and memory statistics of a SWF");
