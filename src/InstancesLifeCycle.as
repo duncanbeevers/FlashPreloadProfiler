@@ -155,12 +155,14 @@
 			trace("Diposing Instances life");
 			
 			mInfos = null;
-			mLegend = null;
 			for (var i:int; i < mLegendTxt.length; i++)
 			{
-				removeChild(mLegendTxt[i]);
+				mLegend.removeChild(mLegendTxt[i]);
 				mLegendTxt[i] = null;	
 			}
+			removeChild(mLegend);
+			mLegend = null;
+			
 			
 			
 			if (mTimer != null)
