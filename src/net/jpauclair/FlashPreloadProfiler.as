@@ -1,4 +1,4 @@
-﻿package 
+﻿package net.jpauclair
 {
 	import flash.display.Bitmap;
 	import flash.display.LoaderInfo;
@@ -12,12 +12,24 @@
 	import flash.events.TimerEvent;
 	import flash.net.Socket;
 	import flash.sampler.*;
+	import flash.system.ApplicationDomain;
 	import flash.ui.ContextMenu;
 	import flash.ui.ContextMenuItem;
 	import flash.ui.Mouse;
 	import flash.utils.getQualifiedClassName;
 	import flash.utils.getTimer;
 	import flash.utils.Timer;
+	import net.jpauclair.event.ChangeToolEvent;
+	import net.jpauclair.ui.button.MenuButton;
+	import net.jpauclair.window.Console;
+	import net.jpauclair.window.FlashStats;
+	import net.jpauclair.window.Help;
+	import net.jpauclair.window.InstancesLifeCycle;
+	import net.jpauclair.window.InternalEventsProfiler;
+	import net.jpauclair.window.MouseListeners;
+	import net.jpauclair.window.Overdraw;
+	import net.jpauclair.window.PerformanceProfiler;
+	import net.jpauclair.window.SamplerProfiler;
 	import nl.demonsters.debugger.MonsterDebugger;
 	
 	//Time to render 1 frame
@@ -40,7 +52,7 @@
 		private var mHookClass:String = "";
 		private var mTraceFiles:Boolean = false;
 		
-		[Embed(source="../art/logo.png")]
+		[Embed(source="../../../art/logo.png")]
 		private var mLogo:Class;			
 		
 		private var ShowInstancesLifeCycle:InstancesLifeCycle = null;
@@ -49,6 +61,7 @@
 		private var ShowStats:FlashStats = null;
 		private var ShowHelp:Help = null;
 		private var ShowProfiler:SamplerProfiler = null;		
+		private var ShowPerformanceProfiler:PerformanceProfiler = null;		
 		private var ShowInternalEvents:InternalEventsProfiler = null;		
 		private var OptionsLayer:Options = null;		
 
@@ -56,8 +69,11 @@
 		private var mStartMonster:Boolean = false;
 		private var mKeepOnTop:Boolean = false;
 		
+		private static var mInstance:FlashPreloadProfiler = null;
+		
         public function FlashPreloadProfiler(embded:Boolean = false, startMonster:Boolean = false, traceLoadedFiles:Boolean = true, keepOnTop:Boolean = true ) : void
         {
+			mInstance = this;
             trace("Starting FlashPreloadProfiler...");
             mEmbeded = embded;
             mStartMonster = startMonster;
@@ -66,7 +82,44 @@
 			
 			if (stage) this.init();
             else {  addEventListener(Event.ADDED_TO_STAGE, this.init); }
+			
+			addEventListener(Event.ENTER_FRAME, OnEnterFrame);
         }
+		
+		private function OnEnterFrame(e:Event):void 
+		{
+			pauseSampling();
+			
+			SampleAnalyzer.GetInstance().ProcessSampling();
+			
+			if (this.ShowHelp != null) { this.ShowHelp.Update(); }
+			if (this.OptionsLayer != null) { this.OptionsLayer.Update(); }
+			if (this.ShowInstancesLifeCycle != null) { this.ShowInstancesLifeCycle.Update(); }
+			if (this.ShowOverdraw != null) this.ShowOverdraw.Update();
+			if (this.ShowMouseListeners != null) this.ShowMouseListeners.Update();
+			if (this.ShowProfiler != null) this.ShowProfiler.Update();
+			if (this.ShowPerformanceProfiler != null) this.ShowPerformanceProfiler.Update();
+			if (this.ShowInternalEvents != null) this.ShowInternalEvents.Update();
+			if (this.ShowStats != null) { this.ShowStats.Update(); }		
+			
+			if (mMinimize)
+			{
+				OptionsLayer.ResetMenu(null);
+				ClearTools();
+				mMinimize = false;
+			}
+			
+			if (mNextTool != null)
+			{
+				ChangeTool(mNextTool);
+				mNextTool = null;
+			}
+			
+			
+			startSampling();
+			clearSamples();
+			
+		}
 
         private function init(event:Event = null) : void
         {
@@ -178,14 +231,7 @@
 				if (this.OptionsLayer != null)
 				{
 					this.OptionsLayer.AutoStartMonsterDebugger = true;
-					this.OptionsLayer.addEventListener("toggleMinimize", function():void { ChangeTool(null); } );
-					this.OptionsLayer.addEventListener("toggleOverdraw", function():void { ChangeTool(Overdraw); } );
-					this.OptionsLayer.addEventListener("toggleMouseListeners", function():void { ChangeTool(MouseListeners); } );
-					this.OptionsLayer.addEventListener("toggleStats", function():void { ChangeTool(FlashStats); } );
-					this.OptionsLayer.addEventListener("toggleInstancesLifeCycle", function():void { ChangeTool(InstancesLifeCycle); } );
-					this.OptionsLayer.addEventListener("toggleProfiler", function():void { ChangeTool(SamplerProfiler); } );
-					this.OptionsLayer.addEventListener("toggleInternalEvents", function():void { ChangeTool(InternalEventsProfiler); } );
-					this.OptionsLayer.addEventListener("toggleHelp", function():void { ChangeTool(Help); } );
+					this.OptionsLayer.addEventListener(ChangeToolEvent.CHANGE_TOOL_EVENT, OnChangeTool);
 				}
 							
 				if (mStartMonster)
@@ -221,6 +267,32 @@
 			
 		}
 		
+		private static var mNextTool:Class = null;
+		private static var mMinimize:Boolean = false;
+		public static function StaticChangeTool(aButton:MenuButton) : void
+		{
+			if (aButton == null) 
+			{
+				mMinimize = true;
+				return;
+			}
+			else
+			{
+				mMinimize = false;
+			}
+			mNextTool = aButton.mTool;
+			if (mInstance.OptionsLayer != null)
+			{
+				mInstance.OptionsLayer.ResetMenu(aButton);
+			}
+		}
+		private function OnChangeTool(e:ChangeToolEvent):void 
+		{
+			SampleAnalyzer.GetInstance().PauseSampling();
+			ChangeTool(e.mTool);
+			SampleAnalyzer.GetInstance().StartSampling();
+		}
+		
 		
 		private function TraceLocalParameters(loaderInfo:LoaderInfo) : void
 		{
@@ -246,8 +318,6 @@
             var alreadyInMenu:Boolean = false;
             var i:int = 0;
             var menuItem:ContextMenuItem = null;
-			var t:int = getTimer();
-			while (getTimer() - t < 100) { }
 			
 			Mouse.show();
 			//Console.Trace("TEST", int(Math.random() * int.MAX_VALUE));
@@ -294,17 +364,18 @@
             }
         }		
 
-		private function ChangeTool(aClass:Class):void
+		private function ClearTools() : void 
 		{
 			if (this.ShowHelp != null) { this.ShowHelp.Dispose(); this.ShowHelp = null; }
 			if (this.ShowInstancesLifeCycle != null) { this.ShowInstancesLifeCycle.Dispose(); this.ShowInstancesLifeCycle = null; }
 			if (this.ShowOverdraw != null) { this.ShowOverdraw.Dispose(); this.ShowOverdraw = null; }
 			if (this.ShowProfiler != null) { this.ShowProfiler.Dispose(); this.ShowProfiler = null; }
+			if (this.ShowPerformanceProfiler != null) { this.ShowPerformanceProfiler.Dispose(); this.ShowPerformanceProfiler = null; }
 			if (this.ShowInternalEvents!= null) { this.ShowInternalEvents.Dispose(); this.ShowInternalEvents = null; }
 			if (this.ShowMouseListeners != null) { this.ShowMouseListeners.Dispose(); this.ShowMouseListeners = null; }
 			if (this.ShowStats != null) { this.ShowStats.Dispose(); this.ShowStats = null; }		
-
 			Options.mIsCamEnabled = false;
+			Options.mIsPerformanceSnaptopEnabled = false;
 			Options.mIsSaveEnabled = false;				
 			Options.mIsClockEnabled = false;
 
@@ -315,9 +386,12 @@
 				this.removeChildAt(0);
 			}
 			this.addChild(OptionsLayer);
+			
+		}
+		private function ChangeTool(aClass:Class):void
+		{
+			ClearTools();
 
-			
-			
 			if (aClass == FlashStats)
 			{
 				Options.mIsSaveEnabled = false;				
@@ -346,16 +420,25 @@
 				Options.mIsCamEnabled = true;
 				Options.mIsSaveEnabled = true;				
 				Options.mIsClockEnabled = true;				
-				OptionsLayer.mRecordingTxt.text = "Save to Clipboard:";
 				OptionsLayer.ShowInterfaceCustomizer(true);
 				this.ShowProfiler = new SamplerProfiler(MainStage);
 				addChildAt(this.ShowProfiler,0);
 			}	
+			else if (aClass == PerformanceProfiler)
+			{
+				
+				Options.mIsSaveEnabled = true;				
+				Options.mIsClockEnabled = true;				
+				Options.mIsPerformanceSnaptopEnabled = true;
+				OptionsLayer.ShowInterfaceCustomizer(true);
+				
+				this.ShowPerformanceProfiler = new PerformanceProfiler(MainStage);
+				addChildAt(this.ShowPerformanceProfiler,0);
+			}				
 			else if (aClass == InternalEventsProfiler)
 			{
 				Options.mIsSaveEnabled = true;				
 				Options.mIsClockEnabled = true;				
-				OptionsLayer.mRecordingTxt.text = "Save to Clipboard:";
 				OptionsLayer.ShowInterfaceCustomizer(true);
 				this.ShowInternalEvents = new InternalEventsProfiler(MainStage);
 				addChildAt(this.ShowInternalEvents,0);
@@ -366,7 +449,7 @@
 				addChildAt(this.ShowMouseListeners,0);
 			}		
 
-
+			SampleAnalyzer.GetInstance().ResumeSampling();
 		}
     }
 }

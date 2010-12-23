@@ -1,4 +1,4 @@
-package  
+package net.jpauclair.window
 {
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
@@ -11,6 +11,7 @@ package
 	import flash.text.TextFieldAutoSize;
 	import flash.text.TextFormat;
 	import flash.utils.ByteArray;
+	import net.jpauclair.IDisposable;
 	/**
 	 * ...
 	 * @author 

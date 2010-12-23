@@ -1,4 +1,4 @@
-﻿package  
+﻿package net.jpauclair.window
 {
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
@@ -38,6 +38,11 @@
 	import flash.utils.getQualifiedClassName;
 	import flash.utils.getTimer;
 	import flash.utils.Timer;
+	import net.jpauclair.data.InternalEventsStatsHolder;
+	import net.jpauclair.IDisposable;
+	import net.jpauclair.Options;
+	import net.jpauclair.SampleAnalyzer;
+	import net.jpauclair.ui.button.MenuButton;
 	/**
 	 * ...
 	 * @author jpauclair
@@ -64,7 +69,9 @@
 		private static const AVM1_COLOR:uint = 			0xFF6E7A16;
 		private static const IO_COLOR:uint = 			0xFF22DE00;
 		private static const MOUSE_COLOR:uint = 		0xFFFF00D8;
-		private static const EXECUTE_QUEUE_COLOR:uint =	0xFFF9E9FF;
+		private static const EXECUTE_QUEUE_COLOR:uint =	0xFFFFFFFF;
+		
+		private static const FREE_COLOR:uint 		=	0xFFFFFFFF;
 		
 								// [abc-decode]() 561226135231 global$init(),[abc-decode]()
 								// [enter-frame]()
@@ -94,6 +101,7 @@
 		
 		 private function Init(mainSprite:Stage) : void
 		{
+			
 			mMainSprite = mainSprite;
 			mInterface = new Sprite();
 			
@@ -211,8 +219,9 @@
 			rect.x = 4+3*100; rect.y = 2+2*14; 
 			mEventsHeaderData.fillRect(rect, EXECUTE_QUEUE_COLOR);			
 			m.tx = rect.x + 12; m.ty = rect.y-4;
-			mInternalEventsLabels.text = "EXECUTE QUEUE ";
+			mInternalEventsLabels.text = "FREE";
 			mEventsHeaderData.draw(mInternalEventsLabels, m);						
+
 			
 			rect.x = 0; rect.y = mEventsHeaderData.height - 5; rect.width = mEventsHeaderData.width, rect.height = 3;
 			mEventsHeaderData.fillRect(rect, 0xFF888888);
@@ -225,14 +234,14 @@
 				//setSamplerCallback(OnTimer);
 			}
 
-			mainSprite.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
+			//mainSprite.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
 			SampleAnalyzer.GetInstance().ObjectStatsEnabled = false;
 			SampleAnalyzer.GetInstance().InternalEventStatsEnabled = true;
 			SampleAnalyzer.GetInstance().StartSampling();
 		}
 		
 		private var mLastTime:int = 0;
-		private function OnEnterFrame(e:Event):void 
+		public function Update():void 
 		{
 			
 			if (frameCount++ % Options.mCurrentClock != 0) return;
@@ -282,7 +291,15 @@
 			ratio = Math.ceil(internalEvents.mRender.entryTime / totalTime * mFrameDivisionData.width);
 			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), RENDER_COLOR);
 			lastX += ratio;		
+
+			ratio = Math.ceil(internalEvents.mFree.entryTime / totalTime * mFrameDivisionData.width);
+			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), FREE_COLOR);
+			lastX += ratio;
 			
+			ratio = Math.ceil(internalEvents.mFree.entryCount*33 / totalTime * mFrameDivisionData.width);
+			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, 1, 2), 0xFF000000);
+			mFrameDivisionData.fillRect(new Rectangle(lastX+1, 0, 1, 2), 0xFFFFFFFF);
+			mFrameDivisionData.fillRect(new Rectangle(lastX+2, 0, 1, 2), 0xFF000000);
 			//ratio = Math.ceil(selfTime / totalTime * mFrameDivisionData.width);
 			//mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), 0xFF000000);
 			//lastX += ratio;		
@@ -290,9 +307,6 @@
 			internalEvents.ResetFrame();
 			
 			Render();
-			
-			SampleAnalyzer.GetInstance().ClearSamples();
-			SampleAnalyzer.GetInstance().ResumeSampling();
 		}
 		
 
@@ -306,278 +320,8 @@
 			this.cacheAsBitmap = true;
 		}
 		
-		
-
-		
-/*
-		private function OnTimer(e:*):void 
-		{
-	
-			
-			
-			//while (getTimer() < hold)
-			//{
-				//do nothing
-			//}
-			//trace("OnTimer");
-			// unsupported technique that seems to force garbage collection
-			//try {
-				//new LocalConnection().connect('foo');
-				//new LocalConnection().connect('foo');
-			//} catch (e:Error) { }
-			//System.pause();
-			
-			if (frameCount++ % mCurrentClock != 0) return;
-			//Math.tan(1);
-			var f:LastObject = new LastObject();
-			pauseSampling();
-			
-			var o:* = getSamples();
-			
-			//trace("SingleFrame");
-			//clearSamples();
-			//var t:int = getTimer();
-			var s1:NewObjectSample;
-			var s2:DeleteObjectSample;
-			var s3:Sample;
-			var holder:StatsHolder = null;
-			//frameCount++;
-			//if (frameCount % 10 == 0) this.visible = !this.visible;
-			
-			//var hold:int = getTimer() + 100;
-			//while(getTimer() < hold) {}
-			var lastO:uint = 0;
-			var firstO:uint = 0;
-			var selfTime:uint = 0;
-			var arr:Array = new Array();
-			for each (var s:Sample in o) 
-			{
-				
-				//trace(s.time);
-				if ((s1 = s as NewObjectSample) != null)
-				{
-					
-					holder = mObjectTypeDict[s1.type] as StatsHolder;
-					if (s1.type == FirstObject)
-					{
-						firstO = s1.time;
-						
-						//lastSampleTime = s1.time;
-						//trace("new time",s1.time-lastSampleTime);
-					}
-					else if (s1.type == LastObject)
-					{
-						lastO = s1.time;
-						selfTime = lastO - firstO;
-						//lastSampleTime = s1.time;
-						//trace("new time",s1.time-lastSampleTime);
-					}
-					if (holder == null)
-					{
-						holder = new StatsHolder()
-						holder.Type = s1.type;
-						holder.TypeName = getQualifiedClassName(s1.type);
-						mStatsTypeList.push(holder);
-
-						mObjectTypeDict[s1.type] = holder;
-						mFullObjectDict[s1.id] = holder;
-						//if (s1.type == String) trace(s1.stack);
-					}
-					else
-					{
-						holder.Added++;
-						holder.Cumul++;
-						holder.Current++;
-						mFullObjectDict[s1.id] = holder;
-						//if (s1.type == Object) trace(s1.stack);
-					}
-					
-				}
-				else if ((s2 = s as DeleteObjectSample)!=null)
-				{
-					if (mFullObjectDict[s2.id] != undefined)
-					{
-						holder = mFullObjectDict[s2.id];
-						
-						holder.Removed++;
-						holder.Current--;
-						delete mFullObjectDict[s2.id];
-					}
-				}
-				else
-				{
-					s3 = s;
-					if (lastSampleTime == 0)
-					{
-						lastSampleTime = s3.time;
-					}	
-					//else
-					//{
-						 //= s3.time;
-					//}
-					
-					{
-						var sf:String = s3.stack[s3.stack.length-1];
-						
-						var timeDiff:Number = s3.time - lastSampleTime;
-						lastSampleTime =  s3.time;
-						
-						switch(sf)
-						{
-							case INTERNAL_EVENT_ENTERFRAME:
-								
-								mInternalStats.AddEnterFrame(timeDiff);
-								break;
-							case INTERNAL_EVENT_MARK:
-								mInternalStats.AddMark(timeDiff);
-								break;
-							case INTERNAL_EVENT_REAP:
-								mInternalStats.AddReap(timeDiff);
-								break;
-							case INTERNAL_EVENT_SWEEP:
-								mInternalStats.AddSweep(timeDiff);
-								break;
-							case INTERNAL_EVENT_PRE_RENDER:
-								mInternalStats.AddPreRender(timeDiff);
-								break;
-							case INTERNAL_EVENT_RENDER:
-								mInternalStats.AddRender(timeDiff);
-								break;
-							case INTERNAL_EVENT_VERIFY:
-								mInternalStats.AddVerify(timeDiff);
-								break;
-							case INTERNAL_EVENT_TIMER_TICK:
-								mInternalStats.AddTimers(timeDiff);
-								break;								
-								
-							default:
-								
-								//trace(sf, s.time,s.stack);// , sf.scriptID);	
-								break;
-						}
-						//trace(sf, s.time,s.stack);// , sf.scriptID);	
-						
-					}
-					arr.push(s.time, s3.stack);
-					lastSampleTime = s.time;
-				}
-				
-				
-			}
-			//trace("BEFORE");
-			//trace(arr);
-			//trace("END");
-			//System.setClipboard(String(arr));
-
-			mStatsTypeList.sortOn("Cumul",Array.NUMERIC|Array.DESCENDING);
-			var len:int = mStatsTypeList.length;
-			if (len > 5) len = 5;
-			var rowIdx:int = 0;
-			for (var i:int = 0; i < len; i++)
-			{
-				rowIdx = i + 1;
-				holder = mStatsTypeList[i];
-				mClassPaths[rowIdx].text = holder.TypeName;
-				mInstanceAddedTxts[rowIdx].text = holder.Added.toString();
-				mInstanceRemovedTxts[rowIdx].text = holder.Removed.toString();
-				mInstanceCurrentTxts[rowIdx].text = holder.Current.toString();
-				mInstanceCumulTxts[rowIdx].text = holder.Cumul.toString();
-				//trace("stats: ", holder.Type, "Added:", holder.Added, "Removed:", holder.Removed, "Current:", holder.Current, "Cumul:", holder.Cumul);					
-				holder.Added = 0;
-				holder.Removed = 0;				
-			}
-
-			
-			if (mInternalStats.sweepTime > 0)
-			{
-				Console.TraceSweep(mInternalStats.sweepTime);
-			}
-			var totalTime:Number = mInternalStats.FrameTime//+selfTime;
-			var lastX:uint = 0;
-			var ratio:uint = 0;
-			mFrameDivisionData.scroll(0, 2);
-			ratio = Math.ceil(mInternalStats.verifyTime / totalTime * mFrameDivisionData.width);
-			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), mInternalStats.verifyColor);
-			lastX += ratio;
-			
-			ratio = Math.ceil(mInternalStats.markTime / totalTime * mFrameDivisionData.width);
-			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), mInternalStats.markColor);
-			lastX += ratio;		
-			
-			ratio = Math.ceil(mInternalStats.reapTime / totalTime * mFrameDivisionData.width);
-			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), mInternalStats.reapColor);
-			lastX += ratio;
-			
-			ratio = Math.ceil(mInternalStats.sweepTime / totalTime * mFrameDivisionData.width);
-			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), mInternalStats.sweepColor);
-			lastX += ratio;
-			
-			ratio = Math.ceil(mInternalStats.enterFrameEventTime / totalTime * mFrameDivisionData.width);
-			//mClassPaths[0].text = ratio;
-			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), mInternalStats.enterFrameColor);
-			lastX += ratio;
-			
-			ratio = Math.ceil(mInternalStats.timersTime / totalTime * mFrameDivisionData.width);
-			//mClassPaths[0].text = ratio;
-			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), mInternalStats.timersColor);
-			lastX += ratio;
-			
-			ratio = Math.ceil(mInternalStats.preRenderTime / totalTime * mFrameDivisionData.width);
-			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), mInternalStats.preRenderColor);
-			lastX += ratio;
-			
-			ratio = Math.ceil(mInternalStats.renderTime / totalTime * mFrameDivisionData.width);
-			mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), mInternalStats.renderColor);
-			lastX += ratio;		
-			
-			//ratio = Math.ceil(selfTime / totalTime * mFrameDivisionData.width);
-			//mFrameDivisionData.fillRect(new Rectangle(lastX, 0, ratio, 2), 0xFF000000);
-			//lastX += ratio;		
-			//
-			//trace("selfTime",selfTime, selfTime/1000/1000)
-			//var frameForTime:int = totalTime / 33333;
-			//for (var j:int = 0; j < frameForTime;j++)
-			//{
-				//mFrameDivisionData.fillRect(new Rectangle(mFrameDivisionData.width/frameForTime*(j+1), 0, 2, 2), 0xFF000000);
-			//}
-			
-			
-			
-			
-			mBitmapBackgroundData.lock();
-			mBitmapBackgroundData.floodFill(0, 0,0);
-			mBitmapBackgroundData.draw(mInterface,null);
-			mBitmapBackgroundData.unlock(mBitmapBackgroundData.rect);
-			this.alpha = mCurrentGradient / 10;
-			this.cacheAsBitmap = true;
-			//mInternalStats.TraceFrame();
-			
-			mInternalStats.ResetFrame();
-			
-			
-			//try {
-				//new LocalConnection().connect('foo');
-				//new LocalConnection().connect('foo');
-			//} catch (e:Error) { }
-			
-			clearSamples();
-			startSampling();
-			//System.resume();
-			if (mInternalStats.FrameTime == 0)
-			{
-				stopSampling();
-				startSampling();
-			}
-			
-			
-			var f2:FirstObject = new FirstObject();
-		}
-	*/	
 		public function Dispose() : void
 		{
-			SampleAnalyzer.GetInstance().StopSampling();
-			SampleAnalyzer.GetInstance().ClearSamples();
-			
 			mInterface.graphics.clear();
 			
 			mInternalEventsLabels = null;
@@ -590,7 +334,7 @@
 			mBitmapBackgroundData = null;
 			mBitmapBackground = null;
 			
-			if (mMainSprite.hasEventListener(Event.ENTER_FRAME)) mMainSprite.removeEventListener(Event.ENTER_FRAME, OnEnterFrame);
+			//if (mMainSprite.hasEventListener(Event.ENTER_FRAME)) mMainSprite.removeEventListener(Event.ENTER_FRAME, OnEnterFrame);
 			
 			if (mMainSprite != null && mMainSprite != null)
 			{

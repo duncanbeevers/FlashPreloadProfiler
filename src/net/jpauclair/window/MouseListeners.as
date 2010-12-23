@@ -1,4 +1,4 @@
-package  
+package net.jpauclair.window
 {
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
@@ -11,6 +11,8 @@ package
 	import flash.events.MouseEvent;
 	import flash.geom.Rectangle;
 	import flash.utils.Dictionary;
+	import net.jpauclair.FlashPreloadProfiler;
+	import net.jpauclair.IDisposable;
 	/**
 	 * ...
 	 * @author jpauclair
@@ -50,16 +52,16 @@ package
 			mRenderTarget.bitmapData = mRenderTargetData;
 			this.addChild(mRenderTarget);
 			
-			mMainSprite.stage.addEventListener(Event.ENTER_FRAME, Update);
+			//mMainSprite.stage.addEventListener(Event.ENTER_FRAME, Update);
 			trace("MouseListeners initialized");
 		}
 		
 		 public function Dispose() : void
 		{
-			if (mMainSprite!= null && mMainSprite.stage != null)
-			{
-				mMainSprite.stage.removeEventListener(Event.ENTER_FRAME, Update);	
-			}
+			//if (mMainSprite!= null && mMainSprite.stage != null)
+			//{
+				//mMainSprite.stage.removeEventListener(Event.ENTER_FRAME, Update);	
+			//}
 			
 			if (mRenderTarget != null)
 			{
@@ -82,7 +84,7 @@ package
 		}
 		
 				
-		private function Update(e:Event):void 
+		public function Update():void 
 		{
 			mRenderTargetData.fillRect(mRenderTargetData.rect, COLOR_BACKGROUND);
 			mRenderTargetData.lock();

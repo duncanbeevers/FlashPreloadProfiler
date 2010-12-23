@@ -1,4 +1,4 @@
-﻿package  
+﻿package net.jpauclair.window
 {
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
@@ -39,6 +39,10 @@
 	import flash.utils.getQualifiedClassName;
 	import flash.utils.getTimer;
 	import flash.utils.Timer;
+	import net.jpauclair.data.ClassTypeStatsHolder;
+	import net.jpauclair.IDisposable;
+	import net.jpauclair.Options;
+	import net.jpauclair.SampleAnalyzer;
 	/**
 	 * ...
 	 * @author jpauclair
@@ -46,7 +50,7 @@
 	
 	//http://help.adobe.com/en_US/FlashPlatform/beta/reference/actionscript/3/flash/sampler/package.html
 
-	public class SamplerProfiler extends Bitmap implements IDisposable
+	public class SamplerProfiler extends Sprite implements IDisposable
 	{
 		
 		private static const COLOR_BACKGROUND:int =	0x444444;
@@ -54,7 +58,9 @@
 		private var mMainSprite:Stage= null;
 			
 		private var mBitmapBackgroundData:BitmapData = null;
+		private var mBitmapLineData:BitmapData = null;
 		private var mBitmapBackground:Bitmap = null;
+		private var mBitmapLine:Bitmap = null;
 		private var mGridLine:Rectangle = null;
 		
 		private var mClassPathColumnStartPos:int = 2
@@ -79,13 +85,21 @@
 		{
 			mMainSprite = mainSprite;
 			mGridLine = new Rectangle();
-			var numLines:int = 15;
 			
 			mBitmapBackgroundData = new BitmapData(mMainSprite.stageWidth, mMainSprite.stageHeight,true,0);
+			mBitmapBackground = new Bitmap(mBitmapBackgroundData);
 			
 			mGridLine.width = mMainSprite.stageWidth;
 			mGridLine.height = 1;
-			this.bitmapData = mBitmapBackgroundData;
+			
+			
+			mBitmapLineData = new BitmapData(mMainSprite.stageWidth, 13, true, 0x88FFD700);
+			
+			mBitmapLine = new Bitmap(mBitmapLineData);			
+			mBitmapLine.y = -20;
+			addChild(mBitmapBackground);
+			addChild(mBitmapLine);
+
 			
 			mCumulColumnStartPos = mMainSprite.stageWidth - 110;
 			mCurrentColumnStartPos = mCumulColumnStartPos - 80;
@@ -118,23 +132,34 @@
 				//setSamplerCallback(OnTimer);
 			}
 
-			mainSprite.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
+			//mainSprite.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
 			
-			SampleAnalyzer.GetInstance().ResetStats();
+			//SampleAnalyzer.GetInstance().ResetStats();
 			
 			SampleAnalyzer.GetInstance().ObjectStatsEnabled = true;
 			SampleAnalyzer.GetInstance().InternalEventStatsEnabled = false;			
 			SampleAnalyzer.GetInstance().StartSampling();
 			
 		}
-		
-		private function OnEnterFrame(e:Event):void 
+		private var mLastLen:int = 0
+		public function Update():void 
 		{
+			
+			if (mouseY >= 42 && mouseY < 42 + mLastLen*14)
+			{
+				mBitmapLine.y = mouseY - (mouseY % 14) - 3;
+			}
+			else 
+			{
+				mBitmapLine.y = -20;
+			}			
 			
 			if (frameCount++ % Options.mCurrentClock != 0) return;
 			var diff:int= getTimer()-mLastTime;
 			mLastTime = getTimer();
 			
+
+
 			
 			SampleAnalyzer.GetInstance().PauseSampling();
 			SampleAnalyzer.GetInstance().ProcessSampling();
@@ -147,40 +172,42 @@
 			
 			var holder:ClassTypeStatsHolder = null;
 			var len:int = classList.length;
-			if (len > 20) len = 20;
-
+			var maxLineCount:int = (stage.stageHeight - 25) / 16;
+			if (len > maxLineCount) len = maxLineCount;
+			//trace(len, maxLineCount);
 			mBlittingTextFieldMatrix.identity();
 			mBlittingTextFieldMatrix.ty = 22;
 
+			mLastLen = len;
 			
 			//Column Name
 			mBlittingTextFieldMatrix.tx = mClassPathColumnStartPos;
 			mBlittingTextField.text = "[QName]";
-			this.bitmapData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
+			this.mBitmapBackgroundData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
 
 			mBlittingTextFieldMatrix.tx = mAddedColumnStartPos;
 			mBlittingTextFieldARight.text = "[Add]"
-			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+			this.mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 
 
 			mBlittingTextFieldMatrix.tx = mDeletedColumnStartPos;
 			mBlittingTextFieldARight.text = "[Del]"
-			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+			this.mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 
 
 			mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
 			mBlittingTextFieldARight.text = "[Current]"
-			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+			this.mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 
 
 			mBlittingTextFieldMatrix.tx = mCumulColumnStartPos;
 			mBlittingTextFieldARight.text = "[Cumul]"
-			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+			this.mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 			
 			mBlittingTextFieldMatrix.ty += 14;
 
 			mGridLine.y = mBlittingTextFieldMatrix.ty+2;
-			this.bitmapData.fillRect(mGridLine, 0xFFCCCCCC);
+			this.mBitmapBackgroundData.fillRect(mGridLine, 0xFFCCCCCC);
 			
 			
 			for (var i:int = 0; i < len; i++)
@@ -188,38 +215,35 @@
 				holder = classList[i];
 				mBlittingTextFieldMatrix.tx = mClassPathColumnStartPos;
 				mBlittingTextField.text = holder.TypeName;
-				this.bitmapData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
+				this.mBitmapBackgroundData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
 
 				mBlittingTextFieldMatrix.tx = mAddedColumnStartPos;
 				mBlittingTextFieldARight.text = holder.Added.toString()
-				this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+				this.mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 
 
 				mBlittingTextFieldMatrix.tx = mDeletedColumnStartPos;
 				mBlittingTextFieldARight.text = holder.Removed.toString();
-				this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+				this.mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 
 
 				mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
 				mBlittingTextFieldARight.text = holder.Current.toString();
-				this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+				this.mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 
 
 				mBlittingTextFieldMatrix.tx = mCumulColumnStartPos;
 				mBlittingTextFieldARight.text = holder.Cumul.toString();
-				this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+				this.mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 				
 				holder.Added = 0;
 				holder.Removed = 0;		
 				mBlittingTextFieldMatrix.ty += 14;
 				mGridLine.y = mBlittingTextFieldMatrix.ty+2;
-				this.bitmapData.fillRect(mGridLine, 0xFFCCCCCC);
+				this.mBitmapBackgroundData.fillRect(mGridLine, 0xFFCCCCCC);
 			}
 			
 			Render();
-			
-			SampleAnalyzer.GetInstance().ClearSamples();
-			SampleAnalyzer.GetInstance().ResumeSampling();
 		}
 		
 
@@ -234,9 +258,6 @@
 		
 		public function Dispose() : void
 		{
-			SampleAnalyzer.GetInstance().StopSampling();
-			SampleAnalyzer.GetInstance().ClearSamples();
-
 			
 			mGridLine = null;
 			
@@ -248,7 +269,7 @@
 			mBitmapBackgroundData = null;
 			mBitmapBackground = null;
 			
-			if (mMainSprite.hasEventListener(Event.ENTER_FRAME)) mMainSprite.removeEventListener(Event.ENTER_FRAME, OnEnterFrame);
+			//if (mMainSprite.hasEventListener(Event.ENTER_FRAME)) mMainSprite.removeEventListener(Event.ENTER_FRAME, OnEnterFrame);
 			
 			if (mMainSprite != null && mMainSprite != null)
 			{

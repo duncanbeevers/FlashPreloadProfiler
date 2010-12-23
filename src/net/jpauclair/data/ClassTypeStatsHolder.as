@@ -1,4 +1,4 @@
-package  
+package net.jpauclair.data
 {
 	/**
 	 * ...

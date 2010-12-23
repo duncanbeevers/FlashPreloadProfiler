@@ -1,4 +1,4 @@
-package  
+package net.jpauclair.data
 {
 	/**
 	 * ...
@@ -21,6 +21,8 @@ package
 		public var mIo:InternalEventEntry = new InternalEventEntry();
 		public var mExecuteQueue:InternalEventEntry = new InternalEventEntry();
 		
+		public var mFree:InternalEventEntry = new InternalEventEntry();
+		
 		
 		public function get FrameTime():Number
 		{
@@ -30,7 +32,8 @@ package
 								+ mPreRender.entryTime
 								+ mRender.entryTime
 								+ mVerify.entryTime
-								+ mTimers.entryTime;
+								+ mTimers.entryTime
+								+ mFree.entryTime;
 			return time;
 			
 		}
@@ -65,6 +68,7 @@ package
 			mMouse.Reset();
 			mIo.Reset();
 			mExecuteQueue.Reset();
+			mFree.Reset();
 		}
 	}
 }

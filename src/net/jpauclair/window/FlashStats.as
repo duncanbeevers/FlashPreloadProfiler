@@ -1,4 +1,4 @@
-package 
+package net.jpauclair.window
 {
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
@@ -17,6 +17,8 @@ package
 	import flash.text.TextFormat;
 	import flash.text.TextFormatAlign;
 	import flash.utils.getTimer;
+	import net.jpauclair.IDisposable;
+	import net.jpauclair.Options;
 	
 	
 	public class FlashStats extends Bitmap implements IDisposable
@@ -113,8 +115,6 @@ package
 			
 			mBlittingTextFieldMatrix = new Matrix();
 			
-			mainSprite.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
-			
 			fps = mainSprite.frameRate;
 			stats.MemoryFree = System.freeMemory / 1024;
 			stats.MemoryPrivate = System.privateMemory / 1024;
@@ -127,7 +127,7 @@ package
 		}
 		
 		private var lastGraphHeight:int = 0;
-		private function OnEnterFrame(e:Event):void 
+		public function Update():void 
 		{
 			timer = getTimer();
 
@@ -331,8 +331,6 @@ package
 			
 			mMemoryValues = null;
 			mMemoryMaxValues = null;
-			
-			if (mMainSprite.hasEventListener(Event.ENTER_FRAME)) mMainSprite.removeEventListener(Event.ENTER_FRAME, OnEnterFrame);
 			
 			if (mMainSprite != null && mMainSprite != null)
 			{

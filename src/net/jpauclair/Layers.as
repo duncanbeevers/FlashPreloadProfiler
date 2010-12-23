@@ -1,4 +1,4 @@
-package  
+package net.jpauclair
 {
 	import flash.display.Bitmap;
 	import flash.display.DisplayObject;

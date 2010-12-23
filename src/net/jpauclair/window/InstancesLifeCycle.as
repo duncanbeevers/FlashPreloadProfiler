@@ -1,4 +1,4 @@
-﻿package  
+﻿package net.jpauclair.window
 {
 	import flash.display.GradientType;
 	import flash.display.Shape;
@@ -16,7 +16,10 @@
 	import flash.text.TextFieldAutoSize;
 	import flash.text.TextFormat;
 	import flash.utils.Dictionary;
+	import flash.utils.getTimer;
 	import flash.utils.Timer;
+	import net.jpauclair.FlashPreloadProfiler;
+	import net.jpauclair.IDisposable;
 	/**
 	 * ...
 	 * @author jpauclair
@@ -41,12 +44,11 @@
 		private var mInfos:TextField;
 		private var mLegendTxt:Array = null;
 		
-		private var mTimer:Timer;
-		
 		private var mAddedLastSecond:int = 0;
 		private var mRemovedLastSecond:int = 0;
 		private var mDOTotal:int = 0;
 		private var mDOToCollect:int = 0;
+		private var mLastTick:int=0;
 		
 		public function InstancesLifeCycle(mainSprite:Stage) 
 		{
@@ -88,7 +90,7 @@
 			
 			mMainSprite.addEventListener(Event.ADDED_TO_STAGE, OnAddedToStage, true);
 			mMainSprite.addEventListener(Event.REMOVED_FROM_STAGE, OnRemovedToStage, true);
-			mMainSprite.addEventListener(Event.ENTER_FRAME, Update);
+
 			this.swapChildren(renderTarget1, renderTarget2);
 			
 			var barWidth:int = mMainSprite.stageWidth;
@@ -140,10 +142,6 @@
 			mLegendTxt[3].text = "Waiting GC";
 			
 			
-			mTimer = new Timer( 1000 );
-			mTimer.addEventListener( TimerEvent.TIMER, OnTimerEvent,false,0,true);
-			mTimer.start();
-		
 			ParseStage(mMainSprite);
 			trace("Instances life initialized");
 			
@@ -165,18 +163,12 @@
 			
 			
 			
-			if (mTimer != null)
-			{
-				mTimer.removeEventListener(TimerEvent.TIMER, OnTimerEvent);
-			}
-			mTimer = null;
 
 			
 			if (mMainSprite != null && mMainSprite != null)
 			{
 				mMainSprite.removeEventListener(Event.ADDED_TO_STAGE, OnAddedToStage, true);
 				mMainSprite.removeEventListener(Event.REMOVED_FROM_STAGE, OnRemovedToStage, true);
-				mMainSprite.removeEventListener(Event.ENTER_FRAME, Update);
 				mMainSprite = null;
 			}
 			mAssetsDict = null;
@@ -184,24 +176,6 @@
 			renderTarget1 = null;
 			renderTarget2 = null;
 			currentRenderTarget = null;
-			
-		}
-		
-		private function OnTimerEvent(e:TimerEvent):void 
-		{
-			var text:String = "DisplayObjectOnStage[ " 
-							+ mDOTotal 
-							+ " ]\tAddedToStage[ "
-							+ mAddedLastSecond 
-							+ " ]\tRemovedFromStage[ "
-							+ mRemovedLastSecond
-							+ " ]\tWaitingGC[ "
-							+ mDOToCollect
-							+ " ]";
-							
-			mInfos.text = text;
-			mDOTotal = mDOTotal + mAddedLastSecond - mRemovedLastSecond;
-			mRemovedLastSecond = mAddedLastSecond = 0;
 			
 		}
 		
@@ -218,10 +192,29 @@
 			this.swapChildren(renderTarget1, renderTarget2);
 		}
 		
-		private function Update(e:Event):void 
+		public function Update():void 
 		{
 			SwapRenderTarget();
-		
+
+			if (getTimer()-mLastTick>=1000)
+			{
+				mLastTick = getTimer();
+				var text:String = "DisplayObjectOnStage[ " 
+								+ mDOTotal 
+								+ " ]\tAddedToStage[ "
+								+ mAddedLastSecond 
+								+ " ]\tRemovedFromStage[ "
+								+ mRemovedLastSecond
+								+ " ]\tWaitingGC[ "
+								+ mDOToCollect
+								+ " ]";
+								
+				mInfos.text = text;
+				mDOTotal = mDOTotal + mAddedLastSecond - mRemovedLastSecond;
+				mRemovedLastSecond = mAddedLastSecond = 0;
+				
+			}
+			
 			
 			currentRenderTarget.graphics.clear();
 

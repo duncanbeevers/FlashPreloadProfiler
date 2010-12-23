@@ -1,4 +1,4 @@
-package  
+package net.jpauclair.window
 {
 	import flash.display.Bitmap;
 	import flash.display.BitmapData;
@@ -14,7 +14,10 @@ package
 	import flash.text.TextFieldAutoSize;
 	import flash.text.TextFormat;
 	import flash.utils.Dictionary;
+	import flash.utils.getTimer;
 	import flash.utils.Timer;
+	import net.jpauclair.FlashPreloadProfiler;
+	import net.jpauclair.IDisposable;
 	/**
 	 * ...
 	 * @author jpauclair
@@ -61,8 +64,6 @@ package
 			//Add RenderTarget to stage.
 			this.addChild(mRenderTarget);
 			
-			// Listen to Enter Frame events.
-			mMainSprite.addEventListener(Event.ENTER_FRAME, Update);
 			
 			var barWidth:int = mMainSprite.stageWidth;
 			var bgSprite:Sprite = new Sprite();
@@ -91,24 +92,10 @@ package
 			addChild( mInfos );
 			mInfos.y = mMainSprite.stageHeight - bgSprite.height;
 
-			mTimer = new Timer( 1000 );
-			mTimer.addEventListener( TimerEvent.TIMER, OnTimerEvent,false,0,true);
-			mTimer.start();
-			
 			trace("Overdraw initialized");
 		}
 		
-		private function OnTimerEvent(e:TimerEvent):void 
-		{
-			var text:String = "DisplayObjectOnStage[ " 
-							+ mDOTotal 
-							+ " ]\tMaxDepth[ "
-							+ mMaxDepth
-							+ " ]";
-							
-			mInfos.text = text;
-			
-		}
+		private var mLastTick:int = 0;
 		
 		/**
 		 * Dispose Everything. Free memory.
@@ -119,16 +106,6 @@ package
 			
 			mInfos = null;
 			
-			if (mTimer != null)
-			{
-				mTimer.removeEventListener(TimerEvent.TIMER, OnTimerEvent);
-			}
-			mTimer = null;
-			
-			if (mMainSprite!= null && mMainSprite != null)
-			{
-				mMainSprite.removeEventListener(Event.ENTER_FRAME, Update);	
-			}
 			
 			if (mRenderTarget != null)
 			{
@@ -149,10 +126,22 @@ package
 			currentRenderTarget = null;
 		}
 				
-		private function Update(e:Event):void 
+		public function Update():void 
 		{
 			//Clear the renderTarget
-			
+
+			if (getTimer()-mLastTick>=1000)
+			{
+				mLastTick = getTimer();
+				var text:String = "DisplayObjectOnStage[ " 
+								+ mDOTotal 
+								+ " ]\tMaxDepth[ "
+								+ mMaxDepth
+								+ " ]";
+								
+				mInfos.text = text;
+				
+			}
 			mRenderTargetData.fillRect(mRenderTargetData.rect, COLOR_BACKGROUND);
 			
 			//Lock the renderTarget during Parsing/Drawing phase.

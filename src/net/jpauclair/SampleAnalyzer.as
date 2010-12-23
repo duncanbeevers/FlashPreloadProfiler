@@ -1,5 +1,7 @@
-package  
+package net.jpauclair
 {
+	import flash.events.Event;
+	import flash.events.SampleDataEvent;
 	import flash.net.LocalConnection;
 	import flash.sampler.clearSamples;
 	import flash.sampler.DeleteObjectSample;
@@ -12,26 +14,30 @@ package
 	import flash.utils.ByteArray;
 	import flash.utils.Dictionary;
 	import flash.utils.getQualifiedClassName;
+	import net.jpauclair.data.ClassTypeStatsHolder;
+	import net.jpauclair.data.InternalEventEntry;
+	import net.jpauclair.data.InternalEventsStatsHolder;
+	import net.jpauclair.window.Console;
 	/**
 	 * ...
 	 * @author 
 	 */
 	public class SampleAnalyzer
 	{
-		private static const INTERNAL_EVENT_VERIFY:String = "[verify]()";
-		private static const INTERNAL_EVENT_MARK:String = "[mark]()";
-		private static const INTERNAL_EVENT_REAP:String = "[reap]()";
-		private static const INTERNAL_EVENT_SWEEP:String = "[sweep]()";
+		private static const INTERNAL_EVENT_VERIFY:String = "[verify]";
+		private static const INTERNAL_EVENT_MARK:String = "[mark]";
+		private static const INTERNAL_EVENT_REAP:String = "[reap]";
+		private static const INTERNAL_EVENT_SWEEP:String = "[sweep]";
 
-		private static const INTERNAL_EVENT_ENTERFRAME:String = "[enterFrameEvent]()";
-		private static const INTERNAL_EVENT_TIMER_TICK:String = "flash.utils::Timer/tick()"
-		private static const INTERNAL_EVENT_PRE_RENDER:String = "[pre-render]()";
-		private static const INTERNAL_EVENT_RENDER:String = "[render]()";
+		private static const INTERNAL_EVENT_ENTERFRAME:String = "[enterFrameEvent]";
+		private static const INTERNAL_EVENT_TIMER_TICK:String = "flash.utils::Timer/tick"
+		private static const INTERNAL_EVENT_PRE_RENDER:String = "[pre-render]";
+		private static const INTERNAL_EVENT_RENDER:String = "[render]";
 		
-		private static const INTERNAL_EVENT_AVM1:String = "[avm1]()";
-		private static const INTERNAL_EVENT_MOUSE:String = "[mouseEvent]()"
-		private static const INTERNAL_EVENT_IO:String = "[io]()";
-		private static const INTERNAL_EVENT_EXECUTE_QUEUE:String = "[execute-queued]()";
+		private static const INTERNAL_EVENT_AVM1:String = "[avm1]";
+		private static const INTERNAL_EVENT_MOUSE:String = "[mouseEvent]"
+		private static const INTERNAL_EVENT_IO:String = "[io]";
+		private static const INTERNAL_EVENT_EXECUTE_QUEUE:String = "[execute-queued]";
 				
 															// [avm1]()
 															// [abc-decode]() 561226135231 global$init(),[abc-decode]()
@@ -48,9 +54,13 @@ package
 		private var mFullObjectDict:Dictionary = null;
 		private var mObjectTypeDict:Dictionary = null;
 		private var mInternalPlayerActionDict:Dictionary = null;
+		
+		private var mFunctionTimes:Dictionary = null;
+		private var mFunctionTimesArray:Array = null;
 
 		private var mStatsTypeList:Array = null;
 		private var lastSampleTime:Number = 0;
+		private var lastSample:Sample = null;
 		
 		private var mIsSampling:Boolean = false;
 		private var mIsSamplingPaused:Boolean = false;
@@ -66,6 +76,8 @@ package
 			mFullObjectDict = new Dictionary();
 			mObjectTypeDict = new Dictionary();
 			mInternalPlayerActionDict = new Dictionary();
+			mFunctionTimes = new Dictionary();
+			mFunctionTimesArray = new Array();
 
 			mStatsTypeList = new Array();
 			lastSampleTime = 0;			
@@ -96,6 +108,7 @@ package
 		{
 			mIsSampling = true;
 			mIsSamplingPaused = false;
+			//trace("Start sampling");
 			startSampling();
 		}
 		
@@ -103,7 +116,9 @@ package
 		{
 			if (mIsSampling && !mIsSamplingPaused)
 			{
+				
 				pauseSampling();
+				//trace("pausing sampling");
 				mIsSamplingPaused = true;
 			}
 		}
@@ -117,6 +132,7 @@ package
 		{
 			if (mIsSampling && mIsSamplingPaused)
 			{
+				//trace("Resume sampling");
 				startSampling();
 				mIsSamplingPaused = false;
 			}
@@ -147,6 +163,11 @@ package
 			return mInternalStats;
 		}
 		
+		public function GetFunctionTimes():Array
+		{
+			return mFunctionTimesArray;
+		}
+		
 		public function GetClassInstanciationStats():Array
 		{
 			return mStatsTypeList;
@@ -157,7 +178,7 @@ package
 			return tempArray;
 		}
 		
-		public function ResetStats() : void
+		public function ResetMemoryStats() : void
 		{
 			for each (var stat:ClassTypeStatsHolder in mStatsTypeList)
 			{
@@ -167,14 +188,20 @@ package
 				stat.Cumul = 0;
 			}
 		}
+		
+		public function ResetPerformanceStats() : void
+		{
+			for each (var stat:InternalEventEntry in mFunctionTimes)
+			{
+				stat.Clear();
+			}
+		}
+
+		
 		private var tempArray:Array = null;
 		private var mIsRecording:Boolean = false;
 		public function ProcessSampling():void
 		{
-			//var f:LastObject = new LastObject();
-			
-			pauseSampling();
-			
 			var o:* = getSamples();
 			
 			var newSample:NewObjectSample;
@@ -199,6 +226,9 @@ package
 			}
 			for each (var s:Sample in o) 
 			{
+				if (lastSampleTime == 0) lastSampleTime = s.time;
+				var timeDiff:Number = s.time - lastSampleTime;
+				lastSampleTime = s.time;
 				if ((newSample = s as NewObjectSample) != null)
 				{
 					if (Options.mIsCollectingData)
@@ -207,8 +237,17 @@ package
 						{
 							tempArray.push(s.time, "NewObject-"+newSample.id + "\tType: " + newSample.type+ "\t" + s.stack);
 						}
-					}						
-					if (!mEnableObjectStats) continue;
+					}		
+					
+					if (newSample.object is Event && s.stack.length == 1)
+					{
+						if (s.stack[0].name == INTERNAL_EVENT_ENTERFRAME)
+						{
+							mInternalStats.mFree.Add(timeDiff);
+						}
+					}
+					
+					if (!mEnableObjectStats) { continue; }
 					
 					holder = mObjectTypeDict[newSample.type] as ClassTypeStatsHolder;
 					if (newSample.type == FirstObject)
@@ -244,8 +283,9 @@ package
 					if (Options.mIsCollectingData)
 					{
 						tempArray.push(s.time, "DeletedObject-"+deleteSample.id);
-					}						
-					if (!mEnableObjectStats) continue;
+					}		
+					
+					if (!mEnableObjectStats) { continue; }
 					if (mFullObjectDict[deleteSample.id] != undefined)
 					{
 						holder = mFullObjectDict[deleteSample.id];
@@ -263,17 +303,42 @@ package
 						{
 							tempArray.push(s.time, "OtherSample\t" + s.stack);
 						}
-					}						
-					if (!mEnableInternalEventStats) continue;
-					basicSample = s;
-					if (lastSampleTime == 0)
-					{
-						lastSampleTime = basicSample.time;
 					}	
-					var sf:String = basicSample.stack[basicSample.stack.length-1];
+					var vStack:Array = s.stack;
+					var stackLen:int = vStack.length;
+					var sf:String = vStack[stackLen-1].name;
 					
-					var timeDiff:Number = basicSample.time - lastSampleTime;
-					lastSampleTime =  basicSample.time;
+					
+					for (var l:int = 0; l < stackLen; l++)
+					{
+						var functionName:String = vStack[l].name;
+						var stat:* = mFunctionTimes[functionName];
+						
+						
+						if (stat == undefined) {
+							stat = new InternalEventEntry();
+							stat.SetStack(vStack);
+							stat.qName = functionName;// + vStack;
+							mFunctionTimesArray.push(stat);
+							mFunctionTimes[functionName] = stat;
+							//trace(stat.qName);
+						}
+						var statEntry:InternalEventEntry = stat;
+
+						if (l == 0)
+						{
+							statEntry.Add(timeDiff);
+						}
+						else
+						{
+							statEntry.AddParentTime(timeDiff);
+						}
+					}
+					
+					
+					
+					
+					if (!mEnableInternalEventStats) { continue; }
 					
 					switch(sf)
 					{
@@ -320,23 +385,13 @@ package
 							//trace(sf, s.time,s.stack);// , sf.scriptID);	
 							break;
 					}
-
-					lastSampleTime = s.time;
 				}
-			
 			}
+			lastSample = s;
 
 			if (mInternalStats.mSweep.entryTime > 0)
 			{
 				Console.TraceSweep(mInternalStats.mSweep.entryTime);
-			}
-			//mInternalStats.ResetFrame();
-			
-			
-			if ((!mIsSamplingPaused && mIsSampling) || mInternalStats.FrameTime == 0)
-			{
-				clearSamples();
-				startSampling();
 			}
 			
 			
