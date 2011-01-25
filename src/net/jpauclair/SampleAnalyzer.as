@@ -1,23 +1,32 @@
 package net.jpauclair
 {
+	import flash.display.Loader;
 	import flash.events.Event;
 	import flash.events.SampleDataEvent;
 	import flash.net.LocalConnection;
+	import flash.net.URLLoader;
+	import flash.net.URLRequest;
+	import flash.net.URLStream;
 	import flash.sampler.clearSamples;
 	import flash.sampler.DeleteObjectSample;
 	import flash.sampler.getSamples;
 	import flash.sampler.NewObjectSample;
 	import flash.sampler.pauseSampling;
 	import flash.sampler.Sample;
+	import flash.sampler.setSamplerCallback;
 	import flash.sampler.startSampling;
 	import flash.sampler.stopSampling;
+	import flash.system.System;
 	import flash.utils.ByteArray;
 	import flash.utils.Dictionary;
 	import flash.utils.getQualifiedClassName;
+	import flash.utils.getTimer;
 	import net.jpauclair.data.ClassTypeStatsHolder;
 	import net.jpauclair.data.InternalEventEntry;
 	import net.jpauclair.data.InternalEventsStatsHolder;
+	import net.jpauclair.window.Configuration;
 	import net.jpauclair.window.Console;
+	import net.jpauclair.window.FlashStats;
 	/**
 	 * ...
 	 * @author 
@@ -67,8 +76,6 @@ package net.jpauclair
 		
 		private static var mInstance:SampleAnalyzer = null;
 		
-		private var mEnableObjectStats:Boolean = true;
-		private var mEnableInternalEventStats:Boolean = true;
 		//private var mInstance
 		
 		public function SampleAnalyzer() 
@@ -83,6 +90,7 @@ package net.jpauclair
 			lastSampleTime = 0;			
 			mInstance = this;
 			tempArray = new Array();
+			setSamplerCallback(SamplerCallBack);
 		}
 		
 		public static function GetInstance() : SampleAnalyzer
@@ -93,16 +101,6 @@ package net.jpauclair
 			}
 			return mInstance;
 		}
-		
-		public function set ObjectStatsEnabled(enable:Boolean) : void
-		{
-			mEnableObjectStats = enable;
-		}
-		
-		public function set InternalEventStatsEnabled(enable:Boolean) : void
-		{
-			mEnableInternalEventStats = enable;
-		}		
 		
 		public function StartSampling() : void
 		{
@@ -197,21 +195,49 @@ package net.jpauclair
 			}
 		}
 
+		private function SamplerCallBack(e:*= null) : void
+		{
+			pauseSampling();
+			ProcessSampling();
+			startSampling();
+		}
 		
 		private var tempArray:Array = null;
 		private var mIsRecording:Boolean = false;
+		private var ms_prev:int=0;
+		//private var mLastURLRequest:URLRequest = null;
 		public function ProcessSampling():void
 		{
+			pauseSampling();
+			
+			
+			if (Configuration.PROFILE_MEMGRAPH)
+			{
+				var timer:int = getTimer();
+
+				if ( timer >= ms_prev+300 ) 
+				{ 
+					FlashStats.mSamplingStartIdx--;
+					if (FlashStats.mSamplingStartIdx < 0) FlashStats.mSamplingStartIdx = FlashStats.mSamplingCount - 1;
+					
+					ms_prev = timer;
+					
+					FlashStats.mMemoryValues[FlashStats.mSamplingStartIdx % FlashStats.mSamplingCount] = System.totalMemory / 1024;
+					if (System.totalMemory / 1024 > FlashStats.stats.MemoryMax)
+					{
+						FlashStats.stats.MemoryMax = System.totalMemory / 1024;;
+					}
+					FlashStats.mMemoryMaxValues[FlashStats.mSamplingStartIdx % FlashStats.mSamplingCount] = FlashStats.stats.MemoryMax;
+				}
+			}
+			
+			
 			var o:* = getSamples();
 			
 			var newSample:NewObjectSample;
 			var deleteSample:DeleteObjectSample;
-			var basicSample:Sample;
 			var holder:ClassTypeStatsHolder = null;
 			
-			var lastO:uint = 0;
-			var firstO:uint = 0;
-			var selfTime:uint = 0;
 			if (Options.mIsCollectingData)
 			{
 				if (!mIsRecording)
@@ -224,189 +250,197 @@ package net.jpauclair
 			{
 				mIsRecording = false;
 			}
+			
+			var sampleStack:Array = null;
 			for each (var s:Sample in o) 
 			{
 				if (lastSampleTime == 0) lastSampleTime = s.time;
 				var timeDiff:Number = s.time - lastSampleTime;
 				lastSampleTime = s.time;
-				if ((newSample = s as NewObjectSample) != null)
+				newSample = s as NewObjectSample
+				sampleStack = s.stack;
+				if (newSample != null)
 				{
+					var obj:* = newSample.object;
 					if (Options.mIsCollectingData)
 					{
-						if (s.stack != null)
+						if (sampleStack != null)
 						{
-							tempArray.push(s.time, "NewObject-"+newSample.id + "\tType: " + newSample.type+ "\t" + s.stack);
+							tempArray.push(s.time, "NewObject\t"+newSample.id + "\t" + newSample.type+ "\t" + sampleStack);
 						}
 					}		
 					
-					if (newSample.object is Event && s.stack.length == 1)
+					if (obj is Event && sampleStack != null && sampleStack.length == 1)
 					{
-						if (s.stack[0].name == INTERNAL_EVENT_ENTERFRAME)
+						if (sampleStack[0].name == INTERNAL_EVENT_ENTERFRAME)
 						{
 							mInternalStats.mFree.Add(timeDiff);
 						}
 					}
 					
-					if (!mEnableObjectStats) { continue; }
+					//if (obj is URLRequest) mLastURLRequest = obj;
+					if (Configuration.PROFILE_LOADERS)
+					{
+						
+						if (obj is Loader) LoaderAnalyser.GetInstance().PushLoader(obj);
+						else if (obj is URLStream) LoaderAnalyser.GetInstance().PushLoader(obj);
+						else if (obj is URLLoader) LoaderAnalyser.GetInstance().PushLoader(obj);
+					}
 					
-					holder = mObjectTypeDict[newSample.type] as ClassTypeStatsHolder;
-					if (newSample.type == FirstObject)
+					if (Configuration.PROFILE_MEMORY)
 					{
-						firstO = newSample.time;
-					}
-					else if (newSample.type == LastObject)
-					{
-						lastO = newSample.time;
-						selfTime = lastO - firstO;
-					}
-					if (holder == null)
-					{
-						holder = new ClassTypeStatsHolder()
-						holder.Type = newSample.type;
-						holder.TypeName = getQualifiedClassName(newSample.type);
-						mStatsTypeList.push(holder);
+						holder = mObjectTypeDict[newSample.type] as ClassTypeStatsHolder;
+						if (holder == null)
+						{
+							
+							holder = new ClassTypeStatsHolder()
+							holder.Type = newSample.type;
+							holder.TypeName = getQualifiedClassName(newSample.type);
+							mStatsTypeList.push(holder);
 
-						mObjectTypeDict[newSample.type] = holder;
-						mFullObjectDict[newSample.id] = holder;
+							mObjectTypeDict[newSample.type] = holder;
+							mFullObjectDict[newSample.id] = holder;
+						}
+						else
+						{
+							holder.Added++;
+							holder.Cumul++;
+							holder.Current++;
+							mFullObjectDict[newSample.id] = holder;
+						}
 					}
-					else
-					{
-						holder.Added++;
-						holder.Cumul++;
-						holder.Current++;
-						mFullObjectDict[newSample.id] = holder;
-					}
-					//trace(newSample.time, newSample.stack);
 				}
 				else if ((deleteSample = s as DeleteObjectSample)!=null)
 				{
 					if (Options.mIsCollectingData)
 					{
-						tempArray.push(s.time, "DeletedObject-"+deleteSample.id);
+						tempArray.push(s.time, "DeletedObject\t"+deleteSample.id);
 					}		
 					
-					if (!mEnableObjectStats) { continue; }
-					if (mFullObjectDict[deleteSample.id] != undefined)
+					//if (!mEnableObjectStats) { continue; }
+
+					if (Configuration.PROFILE_MEMORY)
 					{
-						holder = mFullObjectDict[deleteSample.id];
-						
-						holder.Removed++;
-						holder.Current--;
-						delete mFullObjectDict[deleteSample.id];
+						if (mFullObjectDict[deleteSample.id] != undefined)
+						{
+							holder = mFullObjectDict[deleteSample.id];
+							
+							holder.Removed++;
+							holder.Current--;
+							if (holder.Current > int.MAX_VALUE / 2) holder.Current = 0;
+							delete mFullObjectDict[deleteSample.id];
+						}
 					}
 				}
 				else
 				{
 					if (Options.mIsCollectingData)
 					{
-						if (s.stack != null)
+						if (sampleStack != null)
 						{
-							tempArray.push(s.time, "OtherSample\t" + s.stack);
+							tempArray.push(s.time, "BaseSample\t" + sampleStack);
 						}
 					}	
-					var vStack:Array = s.stack;
-					var stackLen:int = vStack.length;
-					var sf:String = vStack[stackLen-1].name;
-					
-					
-					for (var l:int = 0; l < stackLen; l++)
-					{
-						var functionName:String = vStack[l].name;
-						var stat:* = mFunctionTimes[functionName];
-						
-						
-						if (stat == undefined) {
-							stat = new InternalEventEntry();
-							stat.SetStack(vStack);
-							stat.qName = functionName;// + vStack;
-							mFunctionTimesArray.push(stat);
-							mFunctionTimes[functionName] = stat;
-							//trace(stat.qName);
-						}
-						var statEntry:InternalEventEntry = stat;
 
-						if (l == 0)
+					var sf:String = null;
+					if (Configuration.PROFILE_FUNCTION)
+					{
+						
+						var stackLen:int = sampleStack.length;
+						sf = sampleStack[stackLen-1].name;
+						
+						
+						for (var currentStackDepth:int = 0; currentStackDepth < stackLen; currentStackDepth++)
 						{
-							statEntry.Add(timeDiff);
-						}
-						else
-						{
-							statEntry.AddParentTime(timeDiff);
+							var functionName:String = sampleStack[currentStackDepth].name;
+							var stat:* = mFunctionTimes[functionName];
+							
+							
+							if (stat == undefined) {
+								stat = new InternalEventEntry();
+								stat.SetStack(sampleStack);
+								stat.qName = functionName;// + vStack;
+								mFunctionTimesArray.push(stat);
+								mFunctionTimes[functionName] = stat;
+							}
+							var statEntry:InternalEventEntry = stat;
+
+							if (currentStackDepth == 0)
+							{
+								statEntry.Add(timeDiff);
+							}
+							else
+							{
+								statEntry.AddParentTime(timeDiff);
+							}
 						}
 					}
 					
-					
-					
-					
-					if (!mEnableInternalEventStats) { continue; }
-					
-					switch(sf)
+					if (Configuration.PROFILE_INTERNAL_EVENTS)
 					{
-						case INTERNAL_EVENT_ENTERFRAME:
-							
-							mInternalStats.mEnterFrame.Add(timeDiff);
-							break;
-						case INTERNAL_EVENT_MARK:
-							mInternalStats.mMark.Add(timeDiff);
-							break;
-						case INTERNAL_EVENT_REAP:
-							mInternalStats.mReap.Add(timeDiff);
-							break;
-						case INTERNAL_EVENT_SWEEP:
-							mInternalStats.mSweep.Add(timeDiff);
-							break;
-						case INTERNAL_EVENT_PRE_RENDER:
-							mInternalStats.mPreRender.Add(timeDiff);
-							break;
-						case INTERNAL_EVENT_RENDER:
-							mInternalStats.mRender.Add(timeDiff);
-							break;
-						case INTERNAL_EVENT_VERIFY:
-							mInternalStats.mVerify.Add(timeDiff);
-							break;
-						case INTERNAL_EVENT_TIMER_TICK:
-							mInternalStats.mTimers.Add(timeDiff);
-							break;								
-						case INTERNAL_EVENT_AVM1:
-							mInternalStats.mAvm1.Add(timeDiff);
-							break;						
-						case INTERNAL_EVENT_MOUSE:
-							mInternalStats.mMouse.Add(timeDiff);
-							break;						
-						case INTERNAL_EVENT_IO:
-							mInternalStats.mIo.Add(timeDiff);
-							break;						
-						case INTERNAL_EVENT_EXECUTE_QUEUE:
-							mInternalStats.mExecuteQueue.Add(timeDiff);
-							break;													
-							
-						default:
-							
-							//trace(sf, s.time,s.stack);// , sf.scriptID);	
-							break;
+						if (sf == null)
+						{
+							sf = sampleStack[sampleStack.length-1].name;
+						}
+						switch(sf)
+						{
+							case INTERNAL_EVENT_ENTERFRAME:
+								
+								mInternalStats.mEnterFrame.Add(timeDiff);
+								break;
+							case INTERNAL_EVENT_MARK:
+								mInternalStats.mMark.Add(timeDiff);
+								break;
+							case INTERNAL_EVENT_REAP:
+								mInternalStats.mReap.Add(timeDiff);
+								break;
+							case INTERNAL_EVENT_SWEEP:
+								mInternalStats.mSweep.Add(timeDiff);
+								break;
+							case INTERNAL_EVENT_PRE_RENDER:
+								mInternalStats.mPreRender.Add(timeDiff);
+								break;
+							case INTERNAL_EVENT_RENDER:
+								mInternalStats.mRender.Add(timeDiff);
+								break;
+							case INTERNAL_EVENT_VERIFY:
+								mInternalStats.mVerify.Add(timeDiff);
+								break;
+							case INTERNAL_EVENT_TIMER_TICK:
+								mInternalStats.mTimers.Add(timeDiff);
+								break;								
+							case INTERNAL_EVENT_AVM1:
+								mInternalStats.mAvm1.Add(timeDiff);
+								break;						
+							case INTERNAL_EVENT_MOUSE:
+								mInternalStats.mMouse.Add(timeDiff);
+								break;						
+							case INTERNAL_EVENT_IO:
+								mInternalStats.mIo.Add(timeDiff);
+								break;						
+							case INTERNAL_EVENT_EXECUTE_QUEUE:
+								mInternalStats.mExecuteQueue.Add(timeDiff);
+								break;													
+								
+							default:
+								
+								//trace(sf, s.time,s.stack);// , sf.scriptID);	
+								break;
+						}
 					}
 				}
 			}
 			lastSample = s;
 
-			if (mInternalStats.mSweep.entryTime > 0)
-			{
-				Console.TraceSweep(mInternalStats.mSweep.entryTime);
-			}
+			//if (mInternalStats.mSweep.entryTime > 0)
+			//{
+				//Console.TraceSweep(mInternalStats.mSweep.entryTime);
+			//}
+			clearSamples();
 			
-			
-			var f2:FirstObject = new FirstObject();
 		}
 		
 	}
 
 }
 
-internal class FirstObject
-{
-	
-}
-internal class LastObject
-{
-	
-}

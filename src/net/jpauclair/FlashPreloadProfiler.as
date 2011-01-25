@@ -21,16 +21,21 @@
 	import flash.utils.Timer;
 	import net.jpauclair.event.ChangeToolEvent;
 	import net.jpauclair.ui.button.MenuButton;
+	import net.jpauclair.window.Configuration;
 	import net.jpauclair.window.Console;
 	import net.jpauclair.window.FlashStats;
-	import net.jpauclair.window.Help;
+	
 	import net.jpauclair.window.InstancesLifeCycle;
 	import net.jpauclair.window.InternalEventsProfiler;
+	import net.jpauclair.window.LoaderProfiler;
 	import net.jpauclair.window.MouseListeners;
 	import net.jpauclair.window.Overdraw;
 	import net.jpauclair.window.PerformanceProfiler;
 	import net.jpauclair.window.SamplerProfiler;
 	import nl.demonsters.debugger.MonsterDebugger;
+	
+	//Screen qui affiche les différent ApplicationDomain des moviesclips
+	//Report good / bad site (google analytics)
 	
 	//Time to render 1 frame
 	//Color for spawned after removal
@@ -44,7 +49,7 @@
     {
         public static var MySprite:Sprite = null;
         protected static var MainStage:Stage = null;
-        protected static var MainSprite:Sprite = null;
+        public static var MainSprite:Sprite = null;
 		
 		private static var mInitialized:Boolean = false;	//Only for class merging
 		
@@ -59,10 +64,11 @@
 		private var ShowMouseListeners:MouseListeners = null;
 		private var ShowOverdraw:Overdraw = null;
 		private var ShowStats:FlashStats = null;
-		private var ShowHelp:Help = null;
+		private var ShowConfig:Configuration = null;
 		private var ShowProfiler:SamplerProfiler = null;		
 		private var ShowPerformanceProfiler:PerformanceProfiler = null;		
 		private var ShowInternalEvents:InternalEventsProfiler = null;		
+		private var ShowLoaderProfiler:LoaderProfiler = null;		
 		private var OptionsLayer:Options = null;		
 
 		private var mEmbeded:Boolean = false;
@@ -71,28 +77,30 @@
 		
 		private static var mInstance:FlashPreloadProfiler = null;
 		
-        public function FlashPreloadProfiler(embded:Boolean = false, startMonster:Boolean = false, traceLoadedFiles:Boolean = true, keepOnTop:Boolean = true ) : void
+        public function FlashPreloadProfiler() : void
         {
+			
+			//trace(this.root.name);
+			//return;
 			mInstance = this;
-            trace("Starting FlashPreloadProfiler...");
-            mEmbeded = embded;
-            mStartMonster = startMonster;
-			mTraceFiles = traceLoadedFiles;
-			mKeepOnTop = keepOnTop;
+            trace("Starting FlashPreloadProfiler!");
+			
+			Configuration.Load();
 			
 			if (stage) this.init();
             else {  addEventListener(Event.ADDED_TO_STAGE, this.init); }
 			
-			addEventListener(Event.ENTER_FRAME, OnEnterFrame);
         }
 		
 		private function OnEnterFrame(e:Event):void 
 		{
+			if (MainStage == null) return;
 			pauseSampling();
 			
 			SampleAnalyzer.GetInstance().ProcessSampling();
+			LoaderAnalyser.GetInstance().Update();
 			
-			if (this.ShowHelp != null) { this.ShowHelp.Update(); }
+			if (this.ShowConfig != null) { this.ShowConfig.Update(); }
 			if (this.OptionsLayer != null) { this.OptionsLayer.Update(); }
 			if (this.ShowInstancesLifeCycle != null) { this.ShowInstancesLifeCycle.Update(); }
 			if (this.ShowOverdraw != null) this.ShowOverdraw.Update();
@@ -100,6 +108,7 @@
 			if (this.ShowProfiler != null) this.ShowProfiler.Update();
 			if (this.ShowPerformanceProfiler != null) this.ShowPerformanceProfiler.Update();
 			if (this.ShowInternalEvents != null) this.ShowInternalEvents.Update();
+			if (this.ShowLoaderProfiler != null) this.ShowLoaderProfiler.Update();
 			if (this.ShowStats != null) { this.ShowStats.Update(); }		
 			
 			if (mMinimize)
@@ -125,54 +134,51 @@
         {
             removeEventListener(Event.ADDED_TO_STAGE, this.init);
 
-			if (mEmbeded)
+			if (this.stage.loaderInfo.applicationDomain == this.loaderInfo.applicationDomain)
 			{
+				trace("Direct (embeded) profiler launch");
 				SetRoot(this.stage as Sprite);
 			}
 			else
 			{
+				trace("Indirect profilier launch (waiting for main SWF to load)");
+				root.addEventListener("allComplete", this.allCompleteHandler);	
+			}
+			
 
-				root.addEventListener("allComplete", this.allCompleteHandler);
-
-				TraceLocalParameters(this.loaderInfo);
+			TraceLocalParameters(this.loaderInfo);
+			
+			if (this.loaderInfo.parameters["HookClass"] != undefined)
+			{
 				
-				if (this.loaderInfo.parameters["HookClass"] != undefined)
+				mHookClass = this.loaderInfo.parameters["HookClass"];
+				trace("Trying to hook to class:", mHookClass);
+			}
+			
+			if (this.loaderInfo.parameters["TraceFiles"] != undefined)
+			{
+				if (this.loaderInfo.parameters["TraceFiles"] == "true")
 				{
-					
-					mHookClass = this.loaderInfo.parameters["HookClass"];
-					trace("Trying to hook to class:", mHookClass);
+					mTraceFiles = true;
 				}
-				
-				if (this.loaderInfo.parameters["TraceFiles"] != undefined)
+				trace("Tracing files loaded...");
+			}
+			
+			if (this.loaderInfo.parameters["MonsterDebugger"] != undefined)
+			{
+				if (this.loaderInfo.parameters["MonsterDebugger"] == "true")
 				{
-					if (this.loaderInfo.parameters["TraceFiles"] == "true")
-					{
-						mTraceFiles = true;
-					}
-					trace("Tracing files loaded...");
+					mStartMonster = true;
 				}
-				
-				if (this.loaderInfo.parameters["MonsterDebugger"] != undefined)
-				{
-					if (this.loaderInfo.parameters["MonsterDebugger"] == "true")
-					{
-						mStartMonster = true;
-					}
-					trace("Monster debugger enabled");
-				}			
-			}				
+				trace("Monster debugger enabled");
+			}			
 			
 			MySprite = this;
 			this.mouseEnabled = false;
 			
-			
 			this.OptionsLayer = new Options(MainStage);
 			addChild(this.OptionsLayer);
 			
-			addChild(new Console());
-			//this.ShowOptions =	true;
-			
-			//Console.Trace("test", 0xFFFF0000);
         }
 		
         private function allCompleteHandler(event:Event) : void
@@ -215,11 +221,14 @@
 		
 		private function SetRoot(aSprite:Sprite) : void
 		{
+			root.removeEventListener("allComplete", this.allCompleteHandler);	
 			try 
 			{	
                 MainSprite = aSprite;
                 MainStage = MainSprite.stage;
 
+				MainStage.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
+				
 				OptionsLayer.SetStage(MainStage);
 				//Add our preloader to stage Sprite
                 MainStage.addChild(this);				
@@ -230,11 +239,12 @@
 				
 				if (this.OptionsLayer != null)
 				{
-					this.OptionsLayer.AutoStartMonsterDebugger = true;
-					this.OptionsLayer.addEventListener(ChangeToolEvent.CHANGE_TOOL_EVENT, OnChangeTool);
+					//Configuration.PROFILE_MONSTER
+					//this.OptionsLayer.AutoStartMonsterDebugger = true;
+					//this.OptionsLayer.addEventListener(ChangeToolEvent.CHANGE_TOOL_EVENT, OnChangeTool);
 				}
 							
-				if (mStartMonster)
+				if (Configuration.PROFILE_MONSTER)
 				{
 					debugger = new MonsterDebugger(MainStage);	
 					MainStage.addEventListener("DebuggerDisconnected", this.OptionsLayer.OnDebuggerDisconnect);
@@ -256,7 +266,7 @@
 			
 				mInitialized = true;
 				
-				
+				SampleAnalyzer.GetInstance().ClearSamples();
 				
             }
             catch (e:Error)
@@ -288,9 +298,9 @@
 		}
 		private function OnChangeTool(e:ChangeToolEvent):void 
 		{
-			SampleAnalyzer.GetInstance().PauseSampling();
+			//SampleAnalyzer.GetInstance().PauseSampling();
 			ChangeTool(e.mTool);
-			SampleAnalyzer.GetInstance().StartSampling();
+			//SampleAnalyzer.GetInstance().StartSampling();
 		}
 		
 		
@@ -366,16 +376,19 @@
 
 		private function ClearTools() : void 
 		{
-			if (this.ShowHelp != null) { this.ShowHelp.Dispose(); this.ShowHelp = null; }
+			if (this.ShowConfig != null) { this.ShowConfig.Dispose(); this.ShowConfig = null; }
 			if (this.ShowInstancesLifeCycle != null) { this.ShowInstancesLifeCycle.Dispose(); this.ShowInstancesLifeCycle = null; }
 			if (this.ShowOverdraw != null) { this.ShowOverdraw.Dispose(); this.ShowOverdraw = null; }
 			if (this.ShowProfiler != null) { this.ShowProfiler.Dispose(); this.ShowProfiler = null; }
 			if (this.ShowPerformanceProfiler != null) { this.ShowPerformanceProfiler.Dispose(); this.ShowPerformanceProfiler = null; }
 			if (this.ShowInternalEvents!= null) { this.ShowInternalEvents.Dispose(); this.ShowInternalEvents = null; }
+			if (this.ShowLoaderProfiler!= null) { this.ShowLoaderProfiler.Dispose(); this.ShowLoaderProfiler = null; }
 			if (this.ShowMouseListeners != null) { this.ShowMouseListeners.Dispose(); this.ShowMouseListeners = null; }
 			if (this.ShowStats != null) { this.ShowStats.Dispose(); this.ShowStats = null; }		
 			Options.mIsCamEnabled = false;
 			Options.mIsPerformanceSnaptopEnabled = false;
+			Options.mIsLoaderSnaptopEnabled = false;
+			
 			Options.mIsSaveEnabled = false;				
 			Options.mIsClockEnabled = false;
 
@@ -410,10 +423,10 @@
 				this.ShowOverdraw = new Overdraw(MainStage);
 				addChildAt(this.ShowOverdraw,0);
 			}
-			else if (aClass == Help)
+			else if (aClass == Configuration)
 			{
-				this.ShowHelp = new Help(MainSprite);
-				addChildAt(this.ShowHelp,0);
+				this.ShowConfig = new Configuration(MainSprite);
+				addChildAt(this.ShowConfig,0);
 			}
 			else if (aClass == SamplerProfiler)
 			{
@@ -443,13 +456,22 @@
 				this.ShowInternalEvents = new InternalEventsProfiler(MainStage);
 				addChildAt(this.ShowInternalEvents,0);
 			}			
+			else if (aClass == LoaderProfiler)
+			{
+				Options.mIsSaveEnabled = true;				
+				Options.mIsClockEnabled = true;				
+				Options.mIsLoaderSnaptopEnabled = true;
+				OptionsLayer.ShowInterfaceCustomizer(true);
+				this.ShowLoaderProfiler = new LoaderProfiler(MainStage);
+				addChildAt(this.ShowLoaderProfiler,0);
+			}			
 			else if (aClass == MouseListeners)
 			{
 				this.ShowMouseListeners = new MouseListeners(MainStage);
 				addChildAt(this.ShowMouseListeners,0);
 			}		
 
-			SampleAnalyzer.GetInstance().ResumeSampling();
+			//SampleAnalyzer.GetInstance().ResumeSampling();
 		}
     }
 }

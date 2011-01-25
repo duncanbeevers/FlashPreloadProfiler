@@ -96,6 +96,9 @@
 		
 		public function InternalEventsProfiler(mainSprite:Stage) 
 		{
+			mProfilerWasActive = Configuration.PROFILE_INTERNAL_EVENTS;
+			Configuration.PROFILE_INTERNAL_EVENTS = true;
+
 			Init(mainSprite);
 		}
 		
@@ -235,12 +238,11 @@
 			}
 
 			//mainSprite.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
-			SampleAnalyzer.GetInstance().ObjectStatsEnabled = false;
-			SampleAnalyzer.GetInstance().InternalEventStatsEnabled = true;
-			SampleAnalyzer.GetInstance().StartSampling();
+			//SampleAnalyzer.GetInstance().StartSampling();
 		}
 		
 		private var mLastTime:int = 0;
+		private var mProfilerWasActive:Boolean = false;
 		public function Update():void 
 		{
 			
@@ -322,6 +324,9 @@
 		
 		public function Dispose() : void
 		{
+			Configuration.PROFILE_INTERNAL_EVENTS = mProfilerWasActive;
+			
+			
 			mInterface.graphics.clear();
 			
 			mInternalEventsLabels = null;

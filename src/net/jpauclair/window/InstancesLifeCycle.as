@@ -143,14 +143,14 @@
 			
 			
 			ParseStage(mMainSprite);
-			trace("Instances life initialized");
+			//trace("Instances life initialized");
 			
 			
 		}
 		
 		public function Dispose() : void
 		{
-			trace("Diposing Instances life");
+			//trace("Diposing Instances life");
 			
 			mInfos = null;
 			for (var i:int; i < mLegendTxt.length; i++)

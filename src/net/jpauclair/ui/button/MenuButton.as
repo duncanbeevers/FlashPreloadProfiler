@@ -11,6 +11,7 @@ package net.jpauclair.ui.button
 	import flash.text.TextFormat;
 	import flash.text.TextFormatAlign;
 	import net.jpauclair.data.InternalEventEntry;
+	import net.jpauclair.data.LoaderData;
 	import net.jpauclair.event.ChangeToolEvent;
 	import net.jpauclair.FlashPreloadProfiler;
 	import net.jpauclair.Options;
@@ -33,6 +34,9 @@ package net.jpauclair.ui.button
 		public var mTool:Class = null;
 		private var mIsToggle:Boolean = true;
 		public var mInternalEvent:InternalEventEntry = null;
+		public var mUrl:String = null;
+		public var mLD:LoaderData = null;
+		
 		public function MenuButton(posX:int, posY:int, iconOut:Class, iconSelected:Class, iconOver:Class, toggleEventName:String, aTool:Class, tooltipText:String, aIsToggle:Boolean = true , aToggleText:String=null) 
 		{
 			mIconOut = new iconOut() as Bitmap
@@ -65,8 +69,12 @@ package net.jpauclair.ui.button
 		
 		public function OnClick(e:MouseEvent) : void
 		{
-			e.stopPropagation();
-			e.stopImmediatePropagation();
+			if (e != null)
+			{
+				e.stopPropagation();
+				e.stopImmediatePropagation();
+			}
+			mIconSelected.visible = true;
 			if (mIsSelected)
 			{
 				mIsSelected = false;

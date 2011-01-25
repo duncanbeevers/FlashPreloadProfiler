@@ -10,7 +10,10 @@ package net.jpauclair
 	import flash.events.TextEvent;
 	import flash.filters.ColorMatrixFilter;
 	import flash.filters.GlowFilter;
-	import flash.net.SharedObject;
+	import flash.sampler.pauseSampling;
+	import flash.sampler.startSampling;
+	import net.jpauclair.window.Configuration;
+
 	import flash.system.System;
 	import flash.text.TextField;
 	import flash.text.TextFieldAutoSize;
@@ -20,13 +23,15 @@ package net.jpauclair
 	import flash.utils.Dictionary;
 	import net.jpauclair.data.ClassTypeStatsHolder;
 	import net.jpauclair.data.InternalEventEntry;
+	import net.jpauclair.data.LoaderData;
 	import net.jpauclair.event.ChangeToolEvent;
 	import net.jpauclair.ui.button.MenuButton;
 	import net.jpauclair.ui.ToolTip;
 	import net.jpauclair.window.FlashStats;
-	import net.jpauclair.window.Help;
+	
 	import net.jpauclair.window.InstancesLifeCycle;
 	import net.jpauclair.window.InternalEventsProfiler;
+	import net.jpauclair.window.LoaderProfiler;
 	import net.jpauclair.window.MouseListeners;
 	import net.jpauclair.window.Overdraw;
 	import net.jpauclair.window.PerformanceProfiler;
@@ -42,7 +47,7 @@ package net.jpauclair
 		private static const COLOR_MOUSE_OUT:int =		0xCCCCCC; 
 		private static const COLOR_SELECTED:int =		0xF2B705; 
 
-		private var mSaveObj:SharedObject;
+
 		
 		private var mMouseListenerButton:Sprite;
 		private var mMinimizeButton:Sprite;
@@ -51,7 +56,7 @@ package net.jpauclair
 		private var mShowInstanciator:Sprite;
 		private var mShowProfiler:Sprite;
 		private var mShowInternalEvents:Sprite;
-		private var mShowHelp:Sprite;
+		private var mShowConfig:Sprite;
 		private var iconOff:DisplayObject;
 
 		private var mFoldButton:MenuButton;
@@ -62,100 +67,109 @@ package net.jpauclair
 		private var mMemoryProfilerButton:MenuButton;
 		private var mInternalEventButton:MenuButton;
 		private var mFunctionTimeButton:MenuButton;
-		private var mHelpButton:MenuButton;
+		private var mLoaderProfilerButton:MenuButton;
+		private var mConfigButton:MenuButton;
 		
 		private var mSaveDiskButton:MenuButton;
 		private var mSaveSnapshotButton:MenuButton;
 		private var mClearButton:MenuButton;
 		private var mGCButton:MenuButton;
 		
-		[Embed(source='../../../art/IconHelp.png')]
-		private var IconHelp:Class;		
-		[Embed(source='../../../art/IconHelpOut.png')]
-		private var IconHelpOut:Class;		
+		[Embed(source='../../../art/IconConfig.png')]
+		public static var IconConfig:Class;		
+		[Embed(source='../../../art/IconConfigOut.png')]
+		public static  var IconConfigOut:Class;		
 		
 		[Embed(source='../../../art/IconProfiler.png')]
-		private var IconProfiler:Class;		
+		public static  var IconProfiler:Class;		
 		[Embed(source='../../../art/IconProfilerOut.png')]
-		private var IconProfilerOut:Class;						
+		public static  var IconProfilerOut:Class;						
 		
 		
 		[Embed(source='../../../art/IconOverdraw.png')]
-		private var IconOverdraw:Class;		
+		public static  var IconOverdraw:Class;		
 		[Embed(source='../../../art/IconOverdrawOut.png')]
-		private var IconOverdrawOut:Class;						
+		public static  var IconOverdrawOut:Class;						
 		
 		
 		[Embed(source='../../../art/IconLifecycle.png')]
-		private var IconLifeCycle:Class;		
+		public static  var IconLifeCycle:Class;		
 		[Embed(source='../../../art/IconLifecycleOut.png')]
-		private var IconLifeCyclesOut:Class;						
+		public static  var IconLifeCyclesOut:Class;						
 		
 		[Embed(source='../../../art/IconMouse.png')]
-		private var IconMouse:Class;		
+		public static  var IconMouse:Class;		
 		[Embed(source='../../../art/IconMouseOut.png')]
-		private var IconMouseOut:Class;				
+		public static  var IconMouseOut:Class;				
 		
 		[Embed(source='../../../art/Percent.png')]
-		private var IconPercent:Class;		
+		public static  var IconPercent:Class;		
 		[Embed(source='../../../art/PercentOut.png')]
-		private var IconPercentOut:Class;			
+		public static  var IconPercentOut:Class;			
 		
 		[Embed(source='../../../art/IconStats.png')]
-		private var IconStats:Class;		
+		public static  var IconStats:Class;		
 		[Embed(source='../../../art/IconStatsOut.png')]
-		private var IconStatsOut:Class;				
+		public static  var IconStatsOut:Class;				
+		
+		[Embed(source='../../../art/IconLoaders.png')]
+		public static  var IconLoaders:Class;		
+		[Embed(source='../../../art/IconLoadersOut.png')]
+		public static  var IconLoadersOut:Class;				
 		
 		[Embed(source="../../../art/MonstersRoarIcon.png")]
-		private var DebugerIcon:Class;		
+		public static  var DebugerIcon:Class;		
 		[Embed(source="../../../art/MonstersRoarIconGray.png")]
-		private var DebugerIconDisable:Class;		
-		
+		public static  var DebugerIconDisable:Class;		
+		[Embed(source="../../../art/IconMonster.png")]
+		public static  var IconMonster:Class;		
+		[Embed(source="../../../art/IconMonsterOut.png")]
+		public static  var IconMonsterOut:Class;		
 		
 		[Embed(source='../../../art/ArrowDown.png')]
-		private var IconArrowDown:Class;		
+		public static  var IconArrowDown:Class;		
 		[Embed(source='../../../art/ArrowDownOut.png')]
-		private var IconArrowDownOut:Class;			
+		public static  var IconArrowDownOut:Class;			
 		
 		[Embed(source='../../../art/ArrowUp.png')]
-		private var IconArrowUp:Class;		
+		public static  var IconArrowUp:Class;		
 		[Embed(source='../../../art/ArrowUpOut.png')]
-		private var IconArrowUpOut:Class;			
+		public static  var IconArrowUpOut:Class;			
 		
 		[Embed(source='../../../art/clock.png')]
-		private var IconClock:Class;	
+		public static  var IconClock:Class;	
 		[Embed(source='../../../art/clockOut.png')]
-		private var IconClockOut:Class;			
+		public static  var IconClockOut:Class;			
 		
 		[Embed(source='../../../art/gradient.png')]
-		private var Gradient:Class;		
+		public static  var Gradient:Class;		
 		
 		[Embed(source='../../../art/Disk.png')]
-		private var IconDisk:Class;		
+		public static  var IconDisk:Class;		
 		[Embed(source='../../../art/DiskOver.png')]
-		private var IconDiskOver:Class;		
+		public static  var IconDiskOver:Class;		
 		[Embed(source='../../../art/DiskOut.png')]
-		private var IconDiskOut:Class;				
+		public static  var IconDiskOut:Class;				
 
 		[Embed(source='../../../art/Trash.png')]
-		private var IconTrash:Class;		
+		public static  var IconTrash:Class;		
 		[Embed(source='../../../art/TrashOut.png')]
-		private var IconTrashOut:Class;		
+		public static  var IconTrashOut:Class;		
 
 		[Embed(source='../../../art/cam.png')]
-		private var IconCam:Class;		
+		public static  var IconCam:Class;		
 		[Embed(source='../../../art/camOut.png')]
-		private var IconCamOut:Class;				
+		public static  var IconCamOut:Class;				
 
 		[Embed(source='../../../art/minimize.png')]
-		private var IconMinimize:Class;		
+		public static  var IconMinimize:Class;		
 		[Embed(source='../../../art/minimizeOut.png')]
-		private var IconMinimizeOut:Class;				
+		public static  var IconMinimizeOut:Class;				
 		
 		[Embed(source='../../../art/Clear.png')]
-		private var IconClear:Class;		
+		public static  var IconClear:Class;		
 		[Embed(source='../../../art/ClearOut.png')]
-		private var IconClearOut:Class;				
+		public static  var IconClearOut:Class;				
 		
 		private var mGradientDown:Bitmap;
 		private var mGradientUp:Bitmap;
@@ -178,6 +192,7 @@ package net.jpauclair
 		public static var mCurrentClock:int = 30;		
 		public static var mIsCollectingData:Boolean = false;
 		public static var mIsSaveEnabled:Boolean = false;
+		public static var mIsLoaderSnaptopEnabled:Boolean = false;
 		public static var mIsPerformanceSnaptopEnabled:Boolean = false;
 		public static var mIsClockEnabled:Boolean = false;
 		public static var mIsCamEnabled:Boolean = false;
@@ -193,21 +208,17 @@ package net.jpauclair
 		
 		public function Init() : void
 		{			
-			try
-			{
-				mSaveObj = SharedObject.getLocal("FlashPreloadProfilerOptions");	
-			}
-			catch (e:Error)
-			{
-				mSaveObj = new SharedObject();
-			}
-			
 			if (stage) this.OnAddedToStage();
             else {  addEventListener(Event.ADDED_TO_STAGE, this.OnAddedToStage); }
 		}
 		
 		public static const SAVE_RECORDING_EVENT:String = "SaveRecordingEvent";
 		static public const SAVE_SNAPSHOT_EVENT:String = "saveSnapshotEvent";
+		static public const LOADER_STREAM:String = "URLStream";
+		static public const LOADER_URLLOADER:String = "URLLoader";
+		static public const LOADER_DISPLAY_LOADER:String = "Loader";
+		static public const LOADER_COMPLETED:String = "Success";
+		static public const LOADER_NOT_COMPLETED:String = "Failed";
 		private function OnAddedToStage(e:Event=null) : void
 		{
 			if (e.target == this)
@@ -288,11 +299,17 @@ package net.jpauclair
 			mButtonDict[mFunctionTimeButton] = mFunctionTimeButton;
 			vButtonPosX += 16
 			
+			mLoaderProfilerButton = new MenuButton(vButtonPosX, vButtonPosY, IconLoadersOut, IconLoaders, IconLoadersOut,
+												ChangeToolEvent.CHANGE_TOOL_EVENT, LoaderProfiler, "Loaders Profiler");
+			addChild(mLoaderProfilerButton);
+			mButtonDict[mLoaderProfilerButton] = mLoaderProfilerButton ;
+			vButtonPosX += 16
 			
-			mHelpButton = new MenuButton(vButtonPosX, vButtonPosY, IconHelpOut, IconHelp, IconHelpOut,
-										ChangeToolEvent.CHANGE_TOOL_EVENT, Help, "Help");
-			addChild(mHelpButton);
-			mButtonDict[mHelpButton] = mHelpButton;
+			
+			mConfigButton = new MenuButton(vButtonPosX, vButtonPosY, IconConfigOut, IconConfig, IconConfigOut,
+										ChangeToolEvent.CHANGE_TOOL_EVENT, Configuration, "Configs");
+			addChild(mConfigButton);
+			mButtonDict[mConfigButton] = mConfigButton;
 			vButtonPosX += 16
 
 			debuggerIcon = new DebugerIcon();
@@ -310,7 +327,7 @@ package net.jpauclair
 			mGCButton = new MenuButton(vButtonPosX, vButtonPosY, IconTrashOut, IconTrash, IconTrashOut,
 										null, null, "Force (sync) Garbage Collector",true, "Done");
 			addChild(mGCButton);
-			//mButtonDict[mSaveDiskButton] = mHelpButton;
+			//mButtonDict[mSaveDiskButton] = mConfigButton;
 			vButtonPosX += 16		
 			
 			
@@ -322,21 +339,21 @@ package net.jpauclair
 										null, "Start Recording Samples",true,saveText);
 			addChild(mSaveDiskButton);
 			addEventListener(SAVE_RECORDING_EVENT, OnSaveRecording);
-			//mButtonDict[mSaveDiskButton] = mHelpButton;
+			//mButtonDict[mSaveDiskButton] = mConfigButton;
 			vButtonPosX += 16
 			
 			mSaveSnapshotButton = new MenuButton(vButtonPosX, vButtonPosY, IconCamOut, IconCam, IconCamOut, SAVE_SNAPSHOT_EVENT,
-										null, "Save ALL Memory Allocation to Clipboard",true, "Saved");
+										null, "Save ALL [CurrentProfilerData] to Clipboard",true, "Saved");
 			addChild(mSaveSnapshotButton);
 			addEventListener(SAVE_SNAPSHOT_EVENT, OnSaveSnapshot);
-			//mButtonDict[mSaveDiskButton] = mHelpButton;
+			//mButtonDict[mSaveDiskButton] = mConfigButton;
 			vButtonPosX += 16			
 			
 			
 			mClearButton = new MenuButton(vButtonPosX, vButtonPosY, IconClearOut, IconClear, IconClearOut,
 										null, null, "Clear Current Data",true, "Data cleared");
 			addChild(mClearButton);
-			//mButtonDict[mSaveDiskButton] = mHelpButton;
+			//mButtonDict[mSaveDiskButton] = mConfigButton;
 			vButtonPosX += 16						
 			
 			
@@ -430,8 +447,13 @@ package net.jpauclair
 		
 		private function OnSaveSnapshot(e:Event):void 
 		{
+			pauseSampling();
 			if (mSaveSnapshotButton.mIsSelected)
 			{
+				if (mIsLoaderSnaptopEnabled)
+				{
+					SaveLoaderSnapshot();
+				}				
 				if (mIsPerformanceSnaptopEnabled)
 				{
 					SavePerformanceSnapshot();
@@ -443,13 +465,16 @@ package net.jpauclair
 				
 				mSaveSnapshotButton.Reset();
 			}			
+			startSampling();
 		}
 		
 		private function OnSaveRecording(e:Event):void 
 		{
 			if (mIsCollectingData)
 			{
+				pauseSampling();
 				SaveCollectedData();
+				startSampling();
 			}
 		}
 		
@@ -485,7 +510,7 @@ package net.jpauclair
 			//}
 			mIsCollectingData = mSaveDiskButton.mIsSelected;
 			
-			mSaveSnapshotButton.visible = mIsCamEnabled || mIsPerformanceSnaptopEnabled;
+			mSaveSnapshotButton.visible = mIsCamEnabled || mIsPerformanceSnaptopEnabled || mIsLoaderSnaptopEnabled;
 			mClearButton.visible = mIsCamEnabled || mIsPerformanceSnaptopEnabled;
 			
 			
@@ -526,10 +551,12 @@ package net.jpauclair
 		}
 		
 		private static const ZERO_PERCENT:String = "0.00";
+		private static const ENTRY_TIME_PROPERTY:String = "entryTime";
+		
 		private function SavePerformanceSnapshot():void
 		{
 			var vFunctionTimes:Array = SampleAnalyzer.GetInstance().GetFunctionTimes();
-			vFunctionTimes.sortOn("entryTime", Array.NUMERIC | Array.DESCENDING);
+			vFunctionTimes.sortOn(ENTRY_TIME_PROPERTY, Array.NUMERIC | Array.DESCENDING);
 			
 			var outCam:ByteArray = new ByteArray();
 
@@ -573,17 +600,94 @@ package net.jpauclair
 				outCam.writeUTFBytes(String(holder.mStackFrame));
 				outCam.writeByte(0x0D);
 				outCam.writeByte(0x0A);
-				outCam.position = 0;
-				System.setClipboard(outCam.readUTFBytes(outCam.length));
-			}			
+				
+			
+			}	
+			outCam.position = 0;
+			System.setClipboard(outCam.readUTFBytes(outCam.length));
+			
+		}
+		private static const FIRST_EVENT_PROPERTY:String = "mFirstEvent";
+		private static const NO_URL_FOUND:String = "No url found";
+		private function SaveLoaderSnapshot():void
+		{
+			var vLoadersData:Array = LoaderAnalyser.GetInstance().GetLoadersData();
+			vLoadersData.sortOn(FIRST_EVENT_PROPERTY, Array.NUMERIC | Array.DESCENDING);
+			
+			var outCam:ByteArray = new ByteArray();
+
+			var len:int = vLoadersData.length;
+			var ld:LoaderData;
+			
+			for each (ld in vLoadersData)
+			{
+				if (ld.mFirstEvent == -1) continue;
+				LOADER_DISPLAY_LOADER
+				if (ld.mType == LoaderData.DISPLAY_LOADER)
+				{
+					outCam.writeUTFBytes(LOADER_DISPLAY_LOADER);					
+				}
+				else if (ld.mType == LoaderData.URL_STREAM)
+				{
+					outCam.writeUTFBytes(LOADER_STREAM);					
+				}
+				else if (ld.mType == LoaderData.URL_LOADER)
+				{
+					outCam.writeUTFBytes(LOADER_URLLOADER);					
+				}
+
+				outCam.writeByte(0x09);
+				outCam.writeUTFBytes(ld.mLoadedBytes.toString());
+				outCam.writeByte(0x09);
+				if (ld.mIsFinished)
+				{
+					outCam.writeUTFBytes(LOADER_COMPLETED);	
+				}
+				else
+				{
+					outCam.writeUTFBytes(LOADER_NOT_COMPLETED);	
+					
+				}
+				
+
+				outCam.writeByte(0x09);
+				
+				if (ld.mUrl == null)
+				{
+					outCam.writeUTFBytes(NO_URL_FOUND);
+				}
+				else
+				{
+					outCam.writeUTFBytes(ld.mUrl);	
+				}
+				
+				outCam.writeByte(0x09);
+				if (ld.mIOError)
+				{
+					outCam.writeByte(0x09);	
+					outCam.writeUTFBytes(ld.mIOError.toString());
+				}
+				if (ld.mSecurityError)
+				{
+					outCam.writeByte(0x09);	
+					outCam.writeUTFBytes(ld.mSecurityError.toString());
+				}
+				outCam.writeByte(0x0D);
+				outCam.writeByte(0x0A);
+			
+			
+			}	
+			outCam.position = 0;
+			System.setClipboard(outCam.readUTFBytes(outCam.length));
 			
 		}
 		
+		private static const CUMUL_PROPERTY:String = "Cumul";
 		private function SaveMemorySnapshot():void
 		{
 			var classList:Array = SampleAnalyzer.GetInstance().GetClassInstanciationStats();
 			
-			classList.sortOn("Cumul", Array.NUMERIC | Array.DESCENDING);
+			classList.sortOn(CUMUL_PROPERTY, Array.NUMERIC | Array.DESCENDING);
 			
 			var outCam:ByteArray = new ByteArray();
 			
@@ -600,9 +704,10 @@ package net.jpauclair
 				outCam.writeUTFBytes(holder.Cumul.toString());
 				outCam.writeByte(0x0D);
 				outCam.writeByte(0x0A);
-				outCam.position = 0;
-				System.setClipboard(outCam.readUTFBytes(outCam.length));
+				
 			}			
+			outCam.position = 0;
+			System.setClipboard(outCam.readUTFBytes(outCam.length));
 		}
 		
 		private function SaveCollectedData():void
@@ -745,7 +850,7 @@ package net.jpauclair
 			if (mLastSelected != mShowOverdraw) mShowOverdraw.getChildAt(1).visible = false;
 			if (mLastSelected != mShowProfiler) mShowProfiler.getChildAt(1).visible = false;
 			if (mLastSelected != mShowInternalEvents) mShowInternalEvents.getChildAt(1).visible = false;
-			if (mLastSelected != mShowHelp) mShowHelp.getChildAt(1).visible = false;
+			if (mLastSelected != mShowConfig) mShowConfig.getChildAt(1).visible = false;
 			if (mLastSelected != mMinimizeButton) mMinimizeButton.getChildAt(1).visible = false;
 			
 			if (obj!=null)
@@ -780,28 +885,6 @@ package net.jpauclair
 			}
 			
 		}
-		
-		public function set AutoStartMonsterDebugger(auto:Boolean) : void
-		{
-			mSaveObj.data.autoMonster = auto;
-			mSaveObj.flush();
-		}
-		
-		public function get AutoStartMonsterDebugger() : Boolean
-		{
-			return mSaveObj.data.autoMonster;
-		}
-		
-		public function set AutoStartStatBar(auto:Boolean) : void
-		{
-			mSaveObj.data.autoStats = auto;
-			mSaveObj.flush();
-		}
-		public function get AutoStartStatBar() : Boolean
-		{
-			return mSaveObj.data.autoStats;
-		}
-		
 
 	}
 

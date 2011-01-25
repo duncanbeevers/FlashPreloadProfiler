@@ -49,7 +49,7 @@ package net.jpauclair.data
 			//out += "render" + renderCount.toString() + ":" + renderTime.toString() +", ";
 			//out += "verify" + verifyCount.toString() + ":" + verifyTime.toString() +", ";
 			//out += "timers" + timersCount.toString() + ":" + timersTime.toString();
-			trace(out);
+			//trace(out);
 		}
 		
 		public function ResetFrame() : void

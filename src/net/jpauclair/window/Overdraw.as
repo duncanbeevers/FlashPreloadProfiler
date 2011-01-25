@@ -92,7 +92,7 @@ package net.jpauclair.window
 			addChild( mInfos );
 			mInfos.y = mMainSprite.stageHeight - bgSprite.height;
 
-			trace("Overdraw initialized");
+			//trace("Overdraw initialized");
 		}
 		
 		private var mLastTick:int = 0;

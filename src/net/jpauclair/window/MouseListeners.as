@@ -53,7 +53,7 @@ package net.jpauclair.window
 			this.addChild(mRenderTarget);
 			
 			//mMainSprite.stage.addEventListener(Event.ENTER_FRAME, Update);
-			trace("MouseListeners initialized");
+			//trace("MouseListeners initialized");
 		}
 		
 		 public function Dispose() : void

@@ -74,17 +74,24 @@
 		
 		private var frameCount:int = 0;		
 		private var mLastTime:int = 0;
+		private var mProfilerWasActive:Boolean = false;
 		
 		public function SamplerProfiler(mainSprite:Stage) 
 		{
+			mProfilerWasActive = Configuration.PROFILE_MEMORY;
+			Configuration.PROFILE_MEMORY = true;
+
 			Init(mainSprite);
 		}
 		
 		
 		private function Init(mainSprite:Stage) : void
 		{
+			
 			mMainSprite = mainSprite;
 			mGridLine = new Rectangle();
+			
+			this.mouseEnabled = false;
 			
 			mBitmapBackgroundData = new BitmapData(mMainSprite.stageWidth, mMainSprite.stageHeight,true,0);
 			mBitmapBackground = new Bitmap(mBitmapBackgroundData);
@@ -96,6 +103,7 @@
 			mBitmapLineData = new BitmapData(mMainSprite.stageWidth, 13, true, 0x88FFD700);
 			
 			mBitmapLine = new Bitmap(mBitmapLineData);			
+			
 			mBitmapLine.y = -20;
 			addChild(mBitmapBackground);
 			addChild(mBitmapLine);
@@ -117,12 +125,14 @@
 			mBlittingTextField .defaultTextFormat = myformat;
 			mBlittingTextField .selectable = false;
 			mBlittingTextField .filters = [ myglow ];
+			mBlittingTextField.mouseEnabled = false;
 			
 			mBlittingTextFieldARight = new TextField();
 			mBlittingTextFieldARight.autoSize = TextFieldAutoSize.RIGHT;
 			mBlittingTextFieldARight.defaultTextFormat = myformat2;
 			mBlittingTextFieldARight.selectable = false;
 			mBlittingTextFieldARight.filters = [ myglow ];			
+			mBlittingTextFieldARight.mouseEnabled = false;
 			
 			mBlittingTextFieldMatrix = new Matrix();
 			// Sampler
@@ -134,11 +144,9 @@
 
 			//mainSprite.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
 			
-			//SampleAnalyzer.GetInstance().ResetStats();
 			
-			SampleAnalyzer.GetInstance().ObjectStatsEnabled = true;
-			SampleAnalyzer.GetInstance().InternalEventStatsEnabled = false;			
-			SampleAnalyzer.GetInstance().StartSampling();
+			
+			//SampleAnalyzer.GetInstance().StartSampling();
 			
 		}
 		private var mLastLen:int = 0
@@ -169,6 +177,7 @@
 			var classList:Array = SampleAnalyzer.GetInstance().GetClassInstanciationStats();
 			
 			classList.sortOn("Cumul", Array.NUMERIC | Array.DESCENDING);
+			
 			
 			var holder:ClassTypeStatsHolder = null;
 			var len:int = classList.length;
@@ -213,6 +222,7 @@
 			for (var i:int = 0; i < len; i++)
 			{
 				holder = classList[i];
+				//if (i>0) trace(holder.TypeName,classList[i-1].TypeName, holder.Type==classList[i-1].Type);
 				mBlittingTextFieldMatrix.tx = mClassPathColumnStartPos;
 				mBlittingTextField.text = holder.TypeName;
 				this.mBitmapBackgroundData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
@@ -258,6 +268,12 @@
 		
 		public function Dispose() : void
 		{
+			Configuration.PROFILE_MEMORY = mProfilerWasActive;
+			
+			if (!mProfilerWasActive)
+			{
+				SampleAnalyzer.GetInstance().ResetMemoryStats();
+			}
 			
 			mGridLine = null;
 			

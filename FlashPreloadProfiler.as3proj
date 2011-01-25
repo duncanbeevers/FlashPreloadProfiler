@@ -14,6 +14,7 @@
   <!-- Other classes to be compiled into your SWF -->
   <classpaths>
     <class path="src" />
+    <class path="..\..\..\flex_sdk_4.1.0.16076\frameworks\projects\framework\src" />
   </classpaths>
   <!-- Build options -->
   <build>

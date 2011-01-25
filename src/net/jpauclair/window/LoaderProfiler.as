@@ -1,4 +1,4 @@
-﻿package net.jpauclair.window
+package net.jpauclair.window
 {
 	import flash.desktop.Clipboard;
 	import flash.display.Bitmap;
@@ -43,7 +43,9 @@
 	import flash.utils.Timer;
 	import net.jpauclair.data.ClassTypeStatsHolder;
 	import net.jpauclair.data.InternalEventEntry;
+	import net.jpauclair.data.LoaderData;
 	import net.jpauclair.IDisposable;
+	import net.jpauclair.LoaderAnalyser;
 	import net.jpauclair.Options;
 	import net.jpauclair.SampleAnalyzer;
 	import net.jpauclair.ui.button.MenuButton;
@@ -54,7 +56,7 @@
 	
 	//http://help.adobe.com/en_US/FlashPlatform/beta/reference/actionscript/3/flash/sampler/package.html
 
-	public class PerformanceProfiler extends Sprite implements IDisposable
+	public class LoaderProfiler extends Sprite implements IDisposable
 	{
 		
 		private static const COLOR_BACKGROUND:int =	0x444444;
@@ -67,12 +69,14 @@
 		private var mBitmapLine:Bitmap = null;
 		private var mGridLine:Rectangle = null;
 		
-		private var mClassPathColumnStartPos:int = 2
+		private var mProgressCenterPosition:int = 2
 		private var mAddedColumnStartPos:int = 250;
-		private var mDeletedColumnStartPos:int = 280;
+		private var mURLColPosition:int = 280;
+		private var mSizeColPosition:int = 280;
 		private var mCurrentColumnStartPos:int = 370;
-		private var mCumulColumnStartPos:int = 430;
+		private var mHTTPStatusColPosition:int = 430;
 		private var mBlittingTextField:TextField;
+		private var mBlittingTextFieldCenter:TextField;
 		private var mBlittingTextFieldARight:TextField;
 		private var mBlittingTextFieldMatrix:Matrix = null;
 		
@@ -81,9 +85,10 @@
 		
 		private var mStackButtonArray:Array/*MenuButton*/;		
 
-		[Embed(source='../../../../art/Stack.png')]
+		private var mLoaderDict:Dictionary;
+		[Embed(source='../../../../art/IconClipboard.png')]
 		private var IconStack:Class;		
-		[Embed(source='../../../../art/StackOut.png')]
+		[Embed(source='../../../../art/IconClipboardOut.png')]
 		private var IconStackOut:Class;		
 
 		[Embed(source='../../../../art/ArrowDown.png')]
@@ -91,24 +96,9 @@
 		[Embed(source='../../../../art/ArrowDownOut.png')]
 		private var IconArrowDownOut:Class;			
 		
-		private var mSelfSortButton:MenuButton
-		private var mTotalSortButton:MenuButton
-
-		public static const SAVE_FUNCTION_STACK_EVENT:String = "saveFunctionStackEvent";
-		private static const ZERO_PERCENT:String = "0.00";
-		private static const ENTRY_TIME_PROPERTY:String = "entryTime";
-		private static const ENTRY_TIME_TOTAL_PROPERTY:String = "entryTimeTotal";
-		private var mLastLen:int = 0;
-		private var mUseSelfSort:Boolean = true;
-		private var mProfilerWasActive:Boolean = false;		
-		
-		public function PerformanceProfiler(mainSprite:Stage) 
+		public function LoaderProfiler(mainSprite:Stage) 
 		{
-			mProfilerWasActive = Configuration.PROFILE_FUNCTION;
-			Configuration.PROFILE_FUNCTION  = true;
-			
 			Init(mainSprite);
-			
 		}
 		
 		
@@ -118,6 +108,7 @@
 			mGridLine = new Rectangle();
 			var numLines:int = 15;
 			
+			mLoaderDict = new Dictionary(true);
 			mBitmapBackgroundData = new BitmapData(mMainSprite.stageWidth, mMainSprite.stageHeight,true,0);
 			mBitmapBackground = new Bitmap(mBitmapBackgroundData);
 			
@@ -134,15 +125,21 @@
 			mGridLine.height = 1;
 			//mBitmapBackground.bitmapData = mBitmapBackgroundData;
 			
-			mCumulColumnStartPos = mMainSprite.stageWidth - 110;
-			mCurrentColumnStartPos = mCumulColumnStartPos - 40;
-			mDeletedColumnStartPos = mCurrentColumnStartPos - 100;
-			mAddedColumnStartPos = mDeletedColumnStartPos - 40;
+			
+			mProgressCenterPosition = 20;
+			mHTTPStatusColPosition = 70
+			
+			mSizeColPosition = 130;
+			mURLColPosition = 235;
+			//mCurrentColumnStartPos = mHTTPStatusColPosition - 40;
+			
+			mAddedColumnStartPos = 100;
 			
 			var barWidth:int = mMainSprite.stageWidth;
 
 			var myformat:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false );
 			var myformat2:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false ,null,null,null,null,TextFormatAlign.RIGHT);
+			var myformatCenter:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false ,null,null,null,null,TextFormatAlign.CENTER);
 			var myglow:GlowFilter = new GlowFilter( 0x333333, 1, 2, 2, 3, 2, false, false );
 			
 			mBlittingTextField = new TextField();
@@ -150,14 +147,18 @@
 			mBlittingTextField .defaultTextFormat = myformat;
 			mBlittingTextField .selectable = false;
 			mBlittingTextField .filters = [ myglow ];
-			mBlittingTextField .mouseEnabled = false;
 			
 			mBlittingTextFieldARight = new TextField();
 			mBlittingTextFieldARight.autoSize = TextFieldAutoSize.RIGHT;
 			mBlittingTextFieldARight.defaultTextFormat = myformat2;
 			mBlittingTextFieldARight.selectable = false;
 			mBlittingTextFieldARight.filters = [ myglow ];			
-			mBlittingTextFieldARight.mouseEnabled = false;
+
+			mBlittingTextFieldCenter = new TextField();
+			mBlittingTextFieldCenter.autoSize = TextFieldAutoSize.CENTER;
+			mBlittingTextFieldCenter.defaultTextFormat = myformatCenter;
+			mBlittingTextFieldCenter.selectable = false;
+			mBlittingTextFieldCenter.filters = [ myglow ];
 			
 			mBlittingTextFieldMatrix = new Matrix();
 			// Sampler
@@ -184,11 +185,6 @@
 			}
 			addEventListener(SAVE_FUNCTION_STACK_EVENT, OnSaveStack);
 			
-			mSelfSortButton = new MenuButton(mDeletedColumnStartPos-14, 25, IconArrowDownOut, IconArrowDown, IconArrowDownOut,null, null, "Sort by Self-Time",true,"");
-			addChild(mSelfSortButton);
-			
-			mTotalSortButton= new MenuButton(mCumulColumnStartPos-14, 25, IconArrowDownOut, IconArrowDown, IconArrowDownOut,null, null, "Sort by Total-Time",true,"");
-			addChild(mTotalSortButton);
 				
 			
 			
@@ -196,20 +192,29 @@
 		
 		private function OnSaveStack(e:Event):void 
 		{
+			//trace("OnSaveStack");
 			var len:int = mStackButtonArray.length;
-			
 			for (var i:int = 0; i < len; i++)
 			{
 				var mbt:MenuButton = mStackButtonArray[i];
 				if (mbt != null && mbt.mIsSelected)
 				{
-					
-					var o:String = String(mbt.mInternalEvent.mStackFrame);
-					while(o.indexOf(",") != -1)
+					//trace("OnSaveStack-valid mbt");
+					if (mbt.mUrl != null && mbt.mUrl != "")
 					{
-						o = o.replace(",", "\n");
+						//trace("url");
+						System.setClipboard(mbt.mUrl);
 					}
-					System.setClipboard(o);
+					else if (mbt.mLD != null && mbt.mLD.mIOError)
+					{
+						//trace("io");
+						System.setClipboard(mbt.mLD.mIOError.toString());
+					}
+					else if (mbt.mLD != null && mbt.mLD.mSecurityError)
+					{
+						//trace("security");
+						System.setClipboard(mbt.mLD.mSecurityError.toString());
+					}
 					
 				}
 				if (mbt!= null)
@@ -219,25 +224,11 @@
 			}			
 		}
 		
-		private function OnCopyStack(e:Event):void 
-		{
-			//trace("OnCopy", e.target, e.currentTarget);
-			System.setClipboard(e.target.mInternalEvent.mStackFrame);
-		}
-		
-
+		public static const SAVE_FUNCTION_STACK_EVENT:String = "saveFunctionStackEvent";
+		private static const ZERO_PERCENT:String = "0.00";
+		private var mLastLen:int = 0;
 		public function Update():void 
 		{
-			if (mTotalSortButton.mIsSelected)
-			{
-				mUseSelfSort = false;
-				mTotalSortButton.mIsSelected = false;
-			}
-			if (mSelfSortButton.mIsSelected)
-			{
-				mUseSelfSort = true;
-				mSelfSortButton.mIsSelected = false;
-			}
 			
 			
 			
@@ -262,60 +253,48 @@
 			
 			mBitmapBackgroundData.fillRect(mBitmapBackgroundData.rect, 0xFF000000);
 			
-			var vFunctionTimes:Array = SampleAnalyzer.GetInstance().GetFunctionTimes();
-			
-			if (mUseSelfSort)
-			{
-				vFunctionTimes.sortOn(ENTRY_TIME_PROPERTY, Array.NUMERIC | Array.DESCENDING);
-			}
-			else
-			{
-				vFunctionTimes.sortOn(ENTRY_TIME_TOTAL_PROPERTY, Array.NUMERIC | Array.DESCENDING);
-			}
-			
 			var len:int = mStackButtonArray.length;
 			var i:int = 0;
-			var holder:InternalEventEntry = null;
-			len = vFunctionTimes.length;
-			var totalTime:int = 0;
-			
-			mLastLen = len;
-			
-			for (i = 0; i < len; i++)
-			{
-				holder = vFunctionTimes[i];
-				totalTime += holder.entryTime;
-			}
+
+			var vLoadersData:Array = LoaderAnalyser.GetInstance().GetLoadersData();
+			vLoadersData.sortOn("mFirstEvent", Array.NUMERIC | Array.DESCENDING);
+			var lCount:int = vLoadersData.length;
+
+			len = vLoadersData.length;
 			var maxLineCount:int = (stage.stageHeight - 25) / 16;
 			if (len > maxLineCount) len = maxLineCount;
-			//trace(len, maxLineCount);
 
+			
 			mBlittingTextFieldMatrix.identity();
 			mBlittingTextFieldMatrix.ty = 22;
 
 			
 			//Column Name
-			mBlittingTextFieldMatrix.tx = mClassPathColumnStartPos;
-			mBlittingTextField.text = "[FunctionName]";
+			mBlittingTextFieldMatrix.tx = mProgressCenterPosition;
+			mBlittingTextFieldCenter.text = "Progress";
+			mBitmapBackgroundData.draw(mBlittingTextFieldCenter, mBlittingTextFieldMatrix);
+
+			mBlittingTextFieldMatrix.tx = mURLColPosition;
+			mBlittingTextField.text = "Url"
 			mBitmapBackgroundData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
 
-			mBlittingTextFieldMatrix.tx = mDeletedColumnStartPos;
-			mBlittingTextFieldARight.text = "(%)"
+			
+			//mBlittingTextFieldMatrix.tx = mURLColPosition;
+			//mBlittingTextFieldARight.text = "(%)"
+			//mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+
+
+			//mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
+			//mBlittingTextFieldARight.text = "[Total] (µs)"
+			//mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+
+
+			mBlittingTextFieldMatrix.tx = mHTTPStatusColPosition;
+			mBlittingTextFieldARight.text ="Status"
 			mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
-
-
-			mBlittingTextFieldMatrix.tx = mAddedColumnStartPos;
-			mBlittingTextFieldARight.text = "[Self] (µs)"
-			mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
-
-
-			mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
-			mBlittingTextFieldARight.text = "[Total] (µs)"
-			mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
-
-
-			mBlittingTextFieldMatrix.tx = mCumulColumnStartPos;
-			mBlittingTextFieldARight.text ="(%)"
+			
+			mBlittingTextFieldMatrix.tx = mSizeColPosition;
+			mBlittingTextFieldARight.text ="Size"
 			mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 			
 			mBlittingTextFieldMatrix.ty += 14;
@@ -323,38 +302,71 @@
 			mGridLine.y = mBlittingTextFieldMatrix.ty+2;
 			mBitmapBackgroundData.fillRect(mGridLine, 0xFFCCCCCC);
 			
-			
+			var ld:LoaderData = null;
 			
 			for (i = 0; i < len; i++)
 			{
-				mStackButtonArray[i].visible = true;
 				
-				holder = vFunctionTimes[i];
-				if (mStackButtonArray[i].mInternalEvent != holder)
+				
+				
+				
+				ld = vLoadersData[i];
+				if (ld.mFirstEvent == -1) continue;
+				mStackButtonArray[i].visible = true;
+				DrawProgress(vLoadersData[i], 40 + i * 14);
+				if (mStackButtonArray[i].mUrl != ld.mUrl)
 				{
-					mStackButtonArray[i].SetToolTipText("// Click = Copy to Clipboard\n" + holder.mStack);
-					mStackButtonArray[i].mInternalEvent = holder;
+					
+					mStackButtonArray[i].SetToolTipText("// Click = Copy to Clipboard\n" + ld.mUrl);
+					mStackButtonArray[i].mUrl = ld.mUrl;
+					mStackButtonArray[i].mLD = ld;
 				}
-				mBlittingTextFieldMatrix.tx = mClassPathColumnStartPos + 16;
-				mBlittingTextField.text = holder.qName;
-				//var name:QName = new QName(null, holder.qName);
-				//trace(holder.qName, getInvocationCount(null, name));
-				mBitmapBackgroundData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
-
-				mBlittingTextFieldMatrix.tx = mDeletedColumnStartPos;
-				var percent:Number = int((holder.entryTime / totalTime) * 10000) / 100;
-				if (percent == 0)
+				else if (ld.mIOError)
 				{
-					mBlittingTextFieldARight.text = ZERO_PERCENT;
+					mStackButtonArray[i].SetToolTipText("// Click = Copy to Clipboard\n" + ld.mIOError.text + "\n" + ld.mIOError);
+				}
+				else if (ld.mSecurityError)
+				{
+					mStackButtonArray[i].SetToolTipText("// Click = Copy to Clipboard\n" + ld.mSecurityError.text + "\n" + ld.mSecurityError);
+				}
+				
+
+				
+				mBlittingTextFieldMatrix.tx = mProgressCenterPosition;
+				mBlittingTextFieldCenter.text = ld.mProgressText;
+				mBitmapBackgroundData.draw(mBlittingTextFieldCenter, mBlittingTextFieldMatrix);
+
+				mBlittingTextFieldMatrix.tx = mHTTPStatusColPosition;
+				if (ld.mHTTPStatusText == null)
+				{
+					mBlittingTextFieldARight.text = LoaderData.LOADER_DEFAULT_HTTP_STATUS;
 				}
 				else
 				{
-					mBlittingTextFieldARight.text = String(percent)
+					mBlittingTextFieldARight.text = ld.mHTTPStatusText; 
 				}
-				
 				mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 
 
+				// SIZE
+				mBlittingTextFieldMatrix.tx = mSizeColPosition;
+				mBlittingTextFieldARight.text = ld.mLoadedBytesText; 
+				mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
+				
+				
+				
+				mBlittingTextFieldMatrix.tx = mURLColPosition;
+				if (ld.mUrl == null)
+				{
+					mBlittingTextField.text = LoaderData.LOADER_DEFAULT_URL;
+				}
+				else
+				{
+					mBlittingTextField.text = ld.mUrl; 
+				}
+				mBitmapBackgroundData.draw(mBlittingTextField, mBlittingTextFieldMatrix);
+
+/*
 				mBlittingTextFieldMatrix.tx = mAddedColumnStartPos;
 				mBlittingTextFieldARight.text = holder.entryTime.toString();
 				mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
@@ -365,7 +377,7 @@
 				mBitmapBackgroundData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 //
 //
-				mBlittingTextFieldMatrix.tx = mCumulColumnStartPos;
+				mBlittingTextFieldMatrix.tx = mHTTPStatusColPosition;
 				percent = int((holder.entryTimeTotal / totalTime) * 10000) / 100;
 				if (percent == 0)
 				{
@@ -379,9 +391,11 @@
 				
 				//holder.Added = 0;
 				//holder.Removed = 0;		
+				*/
 				mBlittingTextFieldMatrix.ty += 14;
 				mGridLine.y = mBlittingTextFieldMatrix.ty+2;
 				mBitmapBackgroundData.fillRect(mGridLine, 0xFFCCCCCC);
+				
 			}
 			
 			Render();
@@ -396,17 +410,41 @@
 		}
 		
 
+		private var mProgressBarRect:Rectangle = new Rectangle(20, 0, 100, 11);
+		private function DrawProgress(ld:LoaderData, positionY:int) : void
+		{
+			mProgressBarRect.y = positionY
+			mProgressBarRect.width = 100;
+			var color:uint = 0xFF77ad1b; //Green
+			if (ld.mIOError != null || ld.mSecurityError != null)
+			{
+				color = 0xFFaf1e2d; //Red
+			}
+			else if (ld.mProgress == 0)
+			{
+				color = 0xFF444444;
+			}
+			else
+			{
+				if (ld.mType == LoaderData.DISPLAY_LOADER)
+				{
+					mProgressBarRect.width = 100 * ld.mProgress;
+				}
+				else if (ld.mType == LoaderData.URL_STREAM)
+				{
+					color = 0xFFD9A3B6; //light blue
+				}
+				else
+				{
+					color = 0xFFC4D7ED; //light blue
+				}
+			}
+			mBitmapBackgroundData.fillRect(mProgressBarRect, color);
+		}
+		
 		
 		public function Dispose() : void
 		{
-			
-			Configuration.PROFILE_FUNCTION = mProfilerWasActive;
-			
-			if (!mProfilerWasActive)
-			{
-				SampleAnalyzer.GetInstance().ResetPerformanceStats();
-			}
-			
 			for each (var mb:MenuButton in mStackButtonArray)
 			{
 				mb.Dispose();

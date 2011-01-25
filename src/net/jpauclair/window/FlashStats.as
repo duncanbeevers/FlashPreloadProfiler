@@ -17,6 +17,7 @@ package net.jpauclair.window
 	import flash.text.TextFormat;
 	import flash.text.TextFormatAlign;
 	import flash.utils.getTimer;
+	import net.jpauclair.data.FrameStatistics;
 	import net.jpauclair.IDisposable;
 	import net.jpauclair.Options;
 	
@@ -46,7 +47,7 @@ package net.jpauclair.window
 		private var frameCount:int = 0;		
 		private var mLastTime:int = 0;
 		
-		private var stats:FrameStatistics ;
+		static public var stats:FrameStatistics = new FrameStatistics();
 		private var statsLastFrame:FrameStatistics ;
 		private var timer:int;
 		private var ms_prev:int;
@@ -56,24 +57,22 @@ package net.jpauclair.window
 		private var mGraphPos:Point;
 
 		private var mCurrentMaxMemGraph:int = 0;
-		private var mMemoryValues:Vector.<int> = null;
-		private var mMemoryMaxValues:Vector.<int> = null;
-		private var mSamplingCount:int = 0;
-		private var mSamplingStartIdx:int = 0;
+		static public var mMemoryValues:Vector.<int> = null;
+		static public var mMemoryMaxValues:Vector.<int> = null;
+		static public var mSamplingCount:int = 300;
+		static public var mSamplingStartIdx:int = 0;
+		static public var IsStaticInitialized:Boolean = InitStatic();
 		public function FlashStats(mainSprite:Stage) 
 		{
+			mProfilerWasActive = Configuration.PROFILE_MEMGRAPH;
+			Configuration.PROFILE_MEMGRAPH = true;
+			
 			Init(mainSprite);
 		}
 		
-		
-		private function Init(mainSprite:Stage) : void
+		private static function InitStatic() : Boolean
 		{
-			stats = new FrameStatistics();
-			statsLastFrame = new FrameStatistics();
-			mMainSprite = mainSprite;
-			mGridLine = new Rectangle();
-			var numLines:int = 15;
-			mSamplingCount = int(mMainSprite.stageWidth / 5) + 1;
+			//mSamplingCount = int(mMainSprite.stageWidth / 5) + 1;
 			mMemoryValues = new Vector.<int>(mSamplingCount);
 			mMemoryMaxValues = new Vector.<int>(mSamplingCount);
 			for (var i:int = 0; i < mSamplingCount; i++)
@@ -81,7 +80,25 @@ package net.jpauclair.window
 				mMemoryValues[i] = -1;
 				mMemoryMaxValues[i] = -1
 			}
-		
+			return true;
+		}
+		private function Init(mainSprite:Stage) : void
+		{
+			
+			statsLastFrame = new FrameStatistics();
+			mMainSprite = mainSprite;
+			mGridLine = new Rectangle();
+			var numLines:int = 15;
+			
+			for (var i:int = 0; i < mSamplingCount; i++)
+			{
+				if (!mProfilerWasActive)
+				{
+					mMemoryMaxValues[i] = -1;
+					mMemoryValues[i] = -1;
+				}
+				if (mMemoryMaxValues[i] > stats.MemoryMax) stats.MemoryMax = mMemoryMaxValues[i];
+			}
 			mBitmapBackgroundData = new BitmapData(mMainSprite.stageWidth, mMainSprite.stageHeight,true,0);
 
 			mMemoryUseBitmapData = new BitmapData(mMainSprite.stageWidth, 150,false,0xFFFFFFFF);
@@ -127,14 +144,15 @@ package net.jpauclair.window
 		}
 		
 		private var lastGraphHeight:int = 0;
+		private var mProfilerWasActive:Boolean = false;
 		public function Update():void 
 		{
 			timer = getTimer();
 
 			if ( timer - 1000 < ms_prev ) { fps++; return;  }
 
-			mSamplingStartIdx--;
-			if (mSamplingStartIdx < 0) mSamplingStartIdx = mSamplingCount - 1;
+			//mSamplingStartIdx--;
+			//if (mSamplingStartIdx < 0) mSamplingStartIdx = mSamplingCount - 1;
 			stats.FpsCurrent = fps;
 			ms_prev = timer;
 			
@@ -153,8 +171,7 @@ package net.jpauclair.window
 				
 			}
 
-			mMemoryValues[mSamplingStartIdx % mSamplingCount] = stats.MemoryCurrent;
-			mMemoryMaxValues[mSamplingStartIdx % mSamplingCount] = stats.MemoryMax;
+			
 			
 			if (stats.FpsCurrent < stats.FpsMin) stats.FpsMin = stats.FpsCurrent;
 			if (stats.FpsCurrent > stats.FpsMax) stats.FpsMax = stats.FpsCurrent;
@@ -162,45 +179,52 @@ package net.jpauclair.window
 			
 			mBlittingTextFieldMatrix.identity();
 			mBlittingTextFieldMatrix.ty = 22;
-			
-			// Draw current values
-			mDrawGraphics.graphics.clear();
-			
-			var i:int = 0;
-			var sampleVal:int = 0;
-			var val:int = 0;
-			
-			mDrawGraphics.graphics.lineStyle(5, 0xFFFF0000);
-			var it:int = mSamplingStartIdx+1;
-			var currentX:int = mSamplingCount*5;
-			mDrawGraphics.graphics.moveTo(currentX, 150)
-			for (i= 0; i<mSamplingCount; i++)
-			{
-				it++;
-				sampleVal = mMemoryMaxValues[it % mSamplingCount];
-				if (sampleVal == -1) continue;
-				val = 150 - (sampleVal / stats.MemoryMax * 148);
-				mDrawGraphics.graphics.lineTo(currentX, val);
-				currentX -= 5;
-			}
 
-			mDrawGraphics.graphics.lineStyle(3, 0xFF0000FF);
-			it = mSamplingStartIdx+1;
-			currentX = mSamplingCount*5;
-			mDrawGraphics.graphics.moveTo(currentX, 150)
-			for (i = 0; i<mSamplingCount; i++)
+			if (Configuration.PROFILE_MEMGRAPH)
 			{
-				it++;
-				sampleVal = mMemoryValues[it % mSamplingCount];
-				if (sampleVal == -1) continue;
-				val = 150 - (sampleVal / stats.MemoryMax * 148);
-				mDrawGraphics.graphics.lineTo(currentX, val);
-				currentX -= 5;
-			}
-
 			
-			mMemoryUseBitmapData.fillRect(mMemoryUseBitmapData.rect, 0xFF888888);
-			mMemoryUseBitmapData.draw(mDrawGraphics);
+				// Draw current values
+				mDrawGraphics.graphics.clear();
+				
+				var sliceWidth:Number = stage.stageWidth / mSamplingCount;
+				var i:int = 0;
+				var sampleVal:int = 0;
+				var val:int = 0;
+				
+				mDrawGraphics.graphics.lineStyle(5, 0xFFFF0000);
+				var it:int = mSamplingStartIdx;
+				var currentX:int = mSamplingCount*sliceWidth;
+				mDrawGraphics.graphics.moveTo(currentX, 150)
+				for (i= 0; i<mSamplingCount; i++)
+				{
+					
+					sampleVal = mMemoryMaxValues[it % mSamplingCount];
+					it++;
+					if (sampleVal == -1) continue;
+					val = 150 - (sampleVal / stats.MemoryMax * 148);
+					mDrawGraphics.graphics.lineTo(currentX, val);
+					currentX -= sliceWidth;
+				}
+
+				mDrawGraphics.graphics.lineStyle(3, 0xFF0000FF);
+				it = mSamplingStartIdx;
+				currentX = mSamplingCount*sliceWidth;
+				mDrawGraphics.graphics.moveTo(currentX, 150)
+				for (i = 0; i<mSamplingCount; i++)
+				{
+					
+					sampleVal = mMemoryValues[it % mSamplingCount];
+					it++;
+					if (sampleVal == -1) continue;
+					val = 150 - (sampleVal / stats.MemoryMax * 148);
+					mDrawGraphics.graphics.lineTo(currentX, val);
+					currentX -= sliceWidth;
+				}
+
+				
+				mMemoryUseBitmapData.fillRect(mMemoryUseBitmapData.rect, 0xFF888888);
+				mMemoryUseBitmapData.draw(mDrawGraphics);
+			}
 			//lastGraphHeight = newCurrent;
 			
 			//mDrawGraphics.graphics.clear();
@@ -313,6 +337,11 @@ package net.jpauclair.window
 		
 		public function Dispose() : void
 		{
+			
+			Configuration.PROFILE_MEMGRAPH = mProfilerWasActive;
+			
+
+			
 			mMemoryUseBitmapData.dispose();
 			mMemoryUseBitmapData = null;
 			mBitmapBackgroundData.dispose();
@@ -323,14 +352,14 @@ package net.jpauclair.window
 			mBlittingTextFieldARight = null;
 			mBlittingTextFieldMatrix = null;
 		
-			stats = null;
+			//stats = null;
 			statsLastFrame = null;
 			mDrawGraphics = null;
 			mDrawGraphicsMatrix = null;
 			mGraphPos = null;
 			
-			mMemoryValues = null;
-			mMemoryMaxValues = null;
+			//mMemoryValues = null;
+			//mMemoryMaxValues = null;
 			
 			if (mMainSprite != null && mMainSprite != null)
 			{
@@ -341,30 +370,3 @@ package net.jpauclair.window
 	}
 }
 
-internal class FrameStatistics
-{
-	public var FpsCurrent:int = 0;
-	public var FpsMin:int = int.MAX_VALUE;
-	public var FpsMax:int = 0;
-	
-	public var MemoryCurrent:int = 0;
-	public var MemoryMin:int = int.MAX_VALUE;
-	public var MemoryMax:int = 0;
-	
-	public var MemoryFree:uint = 0;
-	public var MemoryPrivate:uint = 0;
-	
-	public function Copy(obj:FrameStatistics) : void
-	{
-		FpsCurrent = obj.FpsCurrent;
-		FpsMin = obj.FpsMin;
-		FpsMax = obj.FpsMax;
-		
-		MemoryCurrent = obj.MemoryCurrent;
-		MemoryMin = obj.MemoryMin;
-		MemoryMax = obj.MemoryMax;
-		
-		MemoryFree = obj.MemoryFree;
-		MemoryPrivate = obj.MemoryPrivate;
-	}
-}
