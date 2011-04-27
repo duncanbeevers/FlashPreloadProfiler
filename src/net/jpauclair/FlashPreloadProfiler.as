@@ -3,6 +3,7 @@
 	import flash.display.Bitmap;
 	import flash.display.LoaderInfo;
 	import flash.display.Sprite;
+  import flash.display.DisplayObject;
 	import flash.display.Stage;
 	import flash.events.ContextMenuEvent;
 	import flash.events.Event;
@@ -49,7 +50,7 @@
     {
         public static var MySprite:Sprite = null;
         protected static var MainStage:Stage = null;
-        public static var MainSprite:Sprite = null;
+        public static var MainDisplayObject:DisplayObject = null;
 		
 		private static var mInitialized:Boolean = false;	//Only for class merging
 		
@@ -137,7 +138,7 @@
 			if (this.stage.loaderInfo.applicationDomain == this.loaderInfo.applicationDomain)
 			{
 				trace("Direct (embeded) profiler launch");
-				SetRoot(this.stage as Sprite);
+				SetRoot(this.stage as DisplayObject);
 			}
 			else
 			{
@@ -211,7 +212,7 @@
 					trace("File loaded with stage:", loaderInfo.url, "Class:",getQualifiedClassName(loaderInfo.content));
 				}
 				
-				SetRoot(loaderInfo.content.root as Sprite)
+				SetRoot(loaderInfo.content.root as DisplayObject)
 			}
             catch (e:Error)
             {
@@ -219,13 +220,13 @@
             }
         }
 		
-		private function SetRoot(aSprite:Sprite) : void
+		private function SetRoot(aDisplayObject:DisplayObject) : void
 		{
 			root.removeEventListener("allComplete", this.allCompleteHandler);	
 			try 
 			{	
-                MainSprite = aSprite;
-                MainStage = MainSprite.stage;
+                MainDisplayObject = aDisplayObject;
+                MainStage = MainDisplayObject.stage;
 
 				MainStage.addEventListener(Event.ENTER_FRAME, OnEnterFrame);
 				
@@ -344,11 +345,11 @@
 				//Many application re-initialize the menu each frame depending on interaction...
 				//toString make sure we stay in the menu we must made it on top each frame.
 				//TODO is it really needed? (flash param? flash
-				menu = MainSprite.contextMenu;
+				menu = MainDisplayObject.contextMenu;
                 if (menu == null)
                 {
                     menu = new ContextMenu();
-                    MainSprite.contextMenu = menu;
+                    MainDisplayObject.contextMenu = menu;
                 }
                 alreadyInMenu = false;
                 if (menu.customItems != null)
@@ -425,7 +426,7 @@
 			}
 			else if (aClass == Configuration)
 			{
-				this.ShowConfig = new Configuration(MainSprite);
+				this.ShowConfig = new Configuration(MainDisplayObject);
 				addChildAt(this.ShowConfig,0);
 			}
 			else if (aClass == SamplerProfiler)
