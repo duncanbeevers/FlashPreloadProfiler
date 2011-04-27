@@ -5,6 +5,7 @@ package net.jpauclair.window
 	import flash.display.Graphics;
 	import flash.display.Shape;
 	import flash.display.Sprite;
+	import flash.display.DisplayObject;
 	import flash.display.Stage;
 	import flash.events.Event;
 	import flash.filters.GlowFilter;
@@ -27,7 +28,7 @@ package net.jpauclair.window
 		
 		private static const COLOR_BACKGROUND:int =	0x444444;
 		
-		private var mMainSprite:Stage= null;
+		private var mMainStage:Stage= null;
 			
 		private var mMemoryUseBitmapData:BitmapData = null;
 		
@@ -62,12 +63,12 @@ package net.jpauclair.window
 		static public var mSamplingCount:int = 300;
 		static public var mSamplingStartIdx:int = 0;
 		static public var IsStaticInitialized:Boolean = InitStatic();
-		public function FlashStats(mainSprite:Stage) 
+		public function FlashStats(mainStage:Stage)
 		{
 			mProfilerWasActive = Configuration.PROFILE_MEMGRAPH;
 			Configuration.PROFILE_MEMGRAPH = true;
 			
-			Init(mainSprite);
+			Init(mainStage);
 		}
 		
 		private static function InitStatic() : Boolean
@@ -82,11 +83,11 @@ package net.jpauclair.window
 			}
 			return true;
 		}
-		private function Init(mainSprite:Stage) : void
+		private function Init(mainStage:Stage) : void
 		{
 			
 			statsLastFrame = new FrameStatistics();
-			mMainSprite = mainSprite;
+			mMainStage = mainStage;
 			mGridLine = new Rectangle();
 			var numLines:int = 15;
 			
@@ -99,20 +100,20 @@ package net.jpauclair.window
 				}
 				if (mMemoryMaxValues[i] > stats.MemoryMax) stats.MemoryMax = mMemoryMaxValues[i];
 			}
-			mBitmapBackgroundData = new BitmapData(mMainSprite.stageWidth, mMainSprite.stageHeight,true,0);
+			mBitmapBackgroundData = new BitmapData(mMainStage.stageWidth, mMainStage.stageHeight,true,0);
 
-			mMemoryUseBitmapData = new BitmapData(mMainSprite.stageWidth, 150,false,0xFFFFFFFF);
-			mGraphPos = new Point(0, mMainSprite.stageHeight - 150);
+			mMemoryUseBitmapData = new BitmapData(mMainStage.stageWidth, 150,false,0xFFFFFFFF);
+			mGraphPos = new Point(0, mMainStage.stageHeight - 150);
 			mDrawGraphics = new Sprite();
-			mDrawGraphicsMatrix = new Matrix(1,0,0,1,mMainSprite.stageWidth-5);
+			mDrawGraphicsMatrix = new Matrix(1,0,0,1,mMainStage.stageWidth-5);
 			mDrawGraphics.graphics.lineStyle(3, 0xFFFF0000);
 			
-			mGridLine.width = mMainSprite.stageWidth;
+			mGridLine.width = mMainStage.stageWidth;
 			mGridLine.height = 1;
 			this.bitmapData = mBitmapBackgroundData;
 			
 			
-			var barWidth:int = mMainSprite.stageWidth;
+			var barWidth:int = mMainStage.stageWidth;
 
 			var myformat:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false );
 			var myformat2:TextFormat = new TextFormat( "_sans", 11, 0xffffff, false ,null,null,null,null,TextFormatAlign.RIGHT);
@@ -132,7 +133,7 @@ package net.jpauclair.window
 			
 			mBlittingTextFieldMatrix = new Matrix();
 			
-			fps = mainSprite.frameRate;
+			fps = mainStage.frameRate;
 			stats.MemoryFree = System.freeMemory / 1024;
 			stats.MemoryPrivate = System.privateMemory / 1024;
 			
@@ -254,7 +255,7 @@ package net.jpauclair.window
 			
 			
 			mBlittingTextFieldMatrix.tx = mCurrentColumnStartPos;
-			mBlittingTextFieldARight.text = stats.FpsCurrent.toString() + " / " + mMainSprite.frameRate;
+			mBlittingTextFieldARight.text = stats.FpsCurrent.toString() + " / " + mMainStage.frameRate;
 			this.bitmapData.draw(mBlittingTextFieldARight, mBlittingTextFieldMatrix);
 
 			mBlittingTextFieldMatrix.tx = mMinColumnStartPos;
@@ -361,9 +362,9 @@ package net.jpauclair.window
 			//mMemoryValues = null;
 			//mMemoryMaxValues = null;
 			
-			if (mMainSprite != null && mMainSprite != null)
+			if (mMainStage != null && mMainStage != null)
 			{
-				mMainSprite = null;
+				mMainStage = null;
 			}
 		}
 		

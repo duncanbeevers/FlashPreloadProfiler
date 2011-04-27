@@ -3,6 +3,7 @@
 	import flash.display.GradientType;
 	import flash.display.Shape;
 	import flash.display.Sprite;
+	import flash.display.DisplayObject;
 	import flash.events.Event;
 	import flash.events.EventPhase;
 	import flash.events.TimerEvent;
@@ -51,7 +52,7 @@
 	
 		private static var mSaveObj:SharedObject;
 				
-		private var mMainSprite:Sprite = null;
+		private var mMainDisplayObject:DisplayObject = null;
 	
 		private var mInfos:TextField;
 		
@@ -70,24 +71,24 @@
 		private var mButtonDict:Dictionary = new Dictionary(true);;
 		private var mSaveDiskButton:MenuButton;
 		
-		public function Configuration(mainSprite:Sprite) 
+		public function Configuration(mainDisplayObject:DisplayObject) 
 		{
-			Init(mainSprite);
+			Init(mainDisplayObject);
 		}
 		
-		private function Init(mainSprite:Sprite) : void
+		private function Init(mainDisplayObject:DisplayObject) : void
 		{
 			
 			
-			mMainSprite = mainSprite;
+			mMainDisplayObject = mainDisplayObject;
 			
 			//this.mouseChildren = false;
 			this.mouseEnabled = false;
 			
-			var barWidth:int = mMainSprite.stage.stageWidth;
+			var barWidth:int = mMainDisplayObject.stage.stageWidth;
 			var bgSprite:Sprite = new Sprite();
 			this.graphics.beginFill(0x000000, 0.3);
-			this.graphics.drawRect(0, 18, barWidth, mMainSprite.stage.stageHeight-18);
+			this.graphics.drawRect(0, 18, barWidth, mMainDisplayObject.stage.stageHeight-18);
 			this.graphics.endFill();
 			this.graphics.beginFill(0xCCCCCC, 0.6);
 			this.graphics.drawRect(0, 19, barWidth, 1);
@@ -236,9 +237,9 @@
 			this.graphics.clear();
 			mInfos = null;
 			
-			if (mMainSprite != null && mMainSprite.stage != null)
+			if (mMainDisplayObject != null && mMainDisplayObject.stage != null)
 			{
-				mMainSprite = null;
+				mMainDisplayObject = null;
 			}
 		}
 		
