@@ -33,7 +33,7 @@
 	import net.jpauclair.window.Overdraw;
 	import net.jpauclair.window.PerformanceProfiler;
 	import net.jpauclair.window.SamplerProfiler;
-	import nl.demonsters.debugger.MonsterDebugger;
+	import com.demonsters.debugger.MonsterDebugger;
 	
 	//Screen qui affiche les différent ApplicationDomain des moviesclips
 	//Report good / bad site (google analytics)
@@ -54,7 +54,6 @@
 		
 		private static var mInitialized:Boolean = false;	//Only for class merging
 		
-		private var debugger:MonsterDebugger;
 		private var mHookClass:String = "";
 		private var mTraceFiles:Boolean = false;
 		
@@ -135,6 +134,9 @@
         {
             removeEventListener(Event.ADDED_TO_STAGE, this.init);
 
+			this.OptionsLayer = new Options(MainStage);
+			addChild(this.OptionsLayer);
+
 			if (this.stage.loaderInfo.applicationDomain == this.loaderInfo.applicationDomain)
 			{
 				trace("Direct (embeded) profiler launch");
@@ -177,8 +179,6 @@
 			MySprite = this;
 			this.mouseEnabled = false;
 			
-			this.OptionsLayer = new Options(MainStage);
-			addChild(this.OptionsLayer);
 			
         }
 		
@@ -247,9 +247,7 @@
 							
 				if (Configuration.PROFILE_MONSTER)
 				{
-					debugger = new MonsterDebugger(MainStage);	
-					MainStage.addEventListener("DebuggerDisconnected", this.OptionsLayer.OnDebuggerDisconnect);
-					MainStage.addEventListener("DebuggerConnected", this.OptionsLayer.OnDebuggerConnect);
+					MonsterDebugger.initialize(MainStage, '127.0.0.1', this.OptionsLayer.OnDebuggerConnect);
 					//trace("DeMonsterDebugger instanciated");
 				}
 				else

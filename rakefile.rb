@@ -8,6 +8,7 @@ compc "bin/FlashPreloadProfiler.swc" do |t|
   t.target_player = '10.1.0'
   t.source_path << 'src'
   t.include_classes << 'net.jpauclair.FlashPreloadProfiler'
+  t.library_path << 'swcs/MonsterDebugger/MonsterDebugger.swc'
 
   t.title       = 'FlashPreloadProfiler'
   t.creator     = 'jpauclair'

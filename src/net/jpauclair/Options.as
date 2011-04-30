@@ -859,14 +859,14 @@ package net.jpauclair
 			}
 		}
 		
-		public function OnDebuggerConnect(e:Event) : void
+		public function OnDebuggerConnect() : void
 		{
 			if (debuggerIcon != null)
 			{
 				debuggerIcon.visible = true;
 			}
 		}
-		public function OnDebuggerDisconnect(e:Event) : void
+		public function OnDebuggerDisconnect() : void
 		{
 			if (debuggerIcon != null)
 			{
